@@ -20,14 +20,24 @@ test("multi-selection appearance and locks persist as document properties", asyn
   await page.getByLabel("File type").selectOption("json");
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download project" }).click();
-  const doc = JSON.parse(
-    await readFile((await (await downloaded).path())!, "utf8"),
-  );
+  const bytes = await readFile((await (await downloaded).path())!);
+  const doc = JSON.parse(bytes.toString());
   const objects = doc.pages[0].scene.objects;
-  expect(
-    objects.every(
-      (o: { opacity: number; fill: string; lockMovementX: boolean }) =>
-        o.opacity === 0.5 && o.fill === "#112233" && o.lockMovementX,
-    ),
-  ).toBe(true);
+  for (const object of objects)
+    expect(object).toMatchObject({
+      opacity: 0.5,
+      fill: "#112233",
+      lockMovementX: true,
+    });
+  await page
+    .locator('input[accept=".json"]')
+    .setInputFiles({
+      name: "locked.json",
+      mimeType: "application/json",
+      buffer: bytes,
+    });
+  await expect(page.getByRole("status")).toContainText("Project opened");
+  await expect(
+    page.getByRole("button", { name: "Unlock layer 1", exact: true }),
+  ).toBeVisible();
 });

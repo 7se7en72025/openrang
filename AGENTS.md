@@ -21,3 +21,7 @@ Use original templates and permitted fonts/assets. Do not claim full Canva Pro c
 
 Run meaningful checks for project loading/saving, undo, resize and export. Test the actual editor in a browser before calling it ready.
 
+The editor now uses version 2 documents with shared assets and multiple pages. Preserve version 1 imports, independent local project identities, atomic saves, recoverable Trash, and lock/group properties through export/import.
+
+Run `npm run test:unit`, `npm run build`, `npm run check:bundle` and relevant production Playwright checks. CI exercises both Chromium and Firefox, offline reload and real model inference. Do not weaken the performance budgets or replace inference tests with mocked success.
+

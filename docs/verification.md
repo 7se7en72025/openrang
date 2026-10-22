@@ -1,19 +1,30 @@
-# Release verification — 22 October 2026
+# Release verification — 0.2.0
 
-Verified locally on Windows with installed Google Chrome:
+The release workflow builds the actual production app, enforces bundle budgets and exercises 15 browser scenarios in both Chromium and Firefox. See the [current workflow results](https://github.com/7se7en72025/openrang/actions/workflows/check.yml) for the exact source commit and run status.
 
-- TypeScript check and Vite production build.
-- Seven Playwright tests against the built production bundle, including the real IMG.LY model and photo.
-- Text editing, duplication, undo, custom resize, project download/import, reload restoration.
-- PNG file signature, logical dimensions and transparent corner pixel at 2× resolution.
-- SVG text content and PDF file signature.
-- Image project roundtrip and persisted brand-kit name.
-- Rejection of invalid projects, unknown Fabric classes and remote image URLs without losing the current design.
-- Storage quota failure is shown accurately while editable project download remains available.
-- Desktop/mobile screenshots and viewport overflow check.
+## Data and history checks
 
-Background-removal verification checks both transparent and solid pixels in actual inference output. This verifies the integration works on this machine; it does not establish segmentation quality for all images or performance on phones.
+Five Node tests cover version 1 migration, shared-image packing, image/brand validation, coalesced history, undo branches and unreferenced-asset cleanup. A one-million-character image string is retained once across 50 history states.
 
-The final application source also passed [GitHub-hosted Chromium CI](https://github.com/7se7en72025/openrang/actions/runs/39756062842), including a clean npm install, production build and standard browser suite. The network/model test was verified separately on the local production bundle.
+## Production browser checks
 
-Safari, Firefox and mobile hardware were not checked. See README for feature limits.
+- Text editing, duplication, undo, resizing, file import/export and reload restoration.
+- Correct PNG dimensions, transparent pixels, SVG text, JPEG and PDF file signatures.
+- Multi-page PDF page count, page ordering, names and undoing page deletion.
+- Crop offsets, photo filters, flipping and shared images after project-file roundtrips.
+- Group/ungroup geometry, multi-selection appearance and persisted lock flags.
+- A saved-design library, separate copies, recoverable Trash and opening the last project after reload.
+- Brand-kit restore and manual zoom without changing document dimensions.
+- Storage quota failure, rejected remote images, invalid classes and preservation of the current design.
+- Desktop and 390 px responsive layouts.
+- Real model inference, with both foreground and transparent output pixels, and no missing local runtime assets.
+- Opening/closing Help during inference and cancellation without losing the original image.
+- Offline reload, editing, saving and another offline reload after service-worker readiness.
+
+Local checks use installed Chrome and Playwright Firefox. On this resource-constrained Windows machine, Chrome's headless test uses software rendering; CI uses default bundled Chromium. Temporary test profiles were placed on a drive with sufficient space. These are test-environment settings, not requirements imposed on people using the editor.
+
+## Scope and limits
+
+Real inference validates this integration, not segmentation quality for every photo. No foreground detection replaces the original with an empty result; failure, cancellation and timeout leave it recoverable.
+
+Performance figures and automated budgets are documented in [performance.md](performance.md). Safari and real mobile hardware have not been verified. PDF remains raster RGB and offline AI/PDF may require an initial online use. See README for the supported local workflow and remaining product boundaries.

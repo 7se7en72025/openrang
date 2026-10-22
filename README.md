@@ -53,7 +53,7 @@ Trash is recoverable. Open another design before moving the currently open desig
 
 ## Free Pro-style tools
 
-**Background removal:** uses [IMG.LY](https://github.com/imgly/background-removal-js) and CPU ONNX inference. The model/runtime assets download from IMG.LY on first use (tens of MB); your image is processed locally. Inference runs in a worker, supports cancellation and releases its idle runtime. Results depend on the image and device. Empty masks preserve the original photo and show an error.
+**Background removal:** uses [IMG.LY](https://github.com/imgly/background-removal-js) and CPU ONNX inference. The model/runtime assets download from IMG.LY on first use (tens of MB); your image is processed locally. Inference runs in a cancellable worker that is released after each operation, freeing model memory before encoding the final image. Results depend on the image and device. Empty masks preserve the original photo and show an error.
 
 **Resize:** custom sizes with proportional fit-and-center scaling. This does not automatically redesign a composition.
 

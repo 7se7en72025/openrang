@@ -18,4 +18,4 @@ History interns image strings once and retains small document snapshots with ass
 
 Typing and sliders coalesce nearby changes, local persistence is debounced, library listings load metadata rather than all full-size documents, and imports stage objects before replacing the current canvas. PNG/JPEG export uses a Blob rather than building an extra base64 string.
 
-AI inference lives in a dedicated worker and uses transferable pixel buffers. The real-model browser test opens and closes Help during inference to check that controls remain usable. Cancelling terminates the worker; an idle worker is released after 90 seconds.
+AI inference lives in a dedicated worker and uses transferable pixel buffers. The real-model browser test opens and closes Help during inference to check that controls remain usable. The worker is terminated after each result, error or cancellation, releasing model memory before the main thread encodes the final image. This favors lower peak memory over keeping a warm model between edits.

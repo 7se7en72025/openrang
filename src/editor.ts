@@ -31,7 +31,17 @@ FabricObject.ownDefaults.cornerSize = 10;
 FabricObject.ownDefaults.transparentCorners = false;
 FabricObject.ownDefaults.originX = "left";
 FabricObject.ownDefaults.originY = "top";
-FabricObject.customProperties = ["name"];
+FabricObject.customProperties = [
+  "name",
+  "lockMovementX",
+  "lockMovementY",
+  "lockScalingX",
+  "lockScalingY",
+  "lockRotation",
+  "hasControls",
+  "selectable",
+  "evented",
+];
 function countElements(objects: FabricObject[]): number {
   return objects.reduce(
     (n, o) => n + (o instanceof Group ? countElements(o.getObjects()) : 1),
@@ -100,7 +110,6 @@ export class Editor {
   private autoFit = true;
   private worker?: Worker;
   private cancelInference?: () => void;
-  private workerIdle?: ReturnType<typeof setTimeout>;
   private clipboard: FabricObject[] = [];
   constructor(
     element: HTMLCanvasElement,
@@ -853,7 +862,6 @@ export class Editor {
         throw Error(
           "On-device AI needs a browser with Web Workers. Try a recent Chrome, Edge or Firefox.",
         );
-      clearTimeout(this.workerIdle);
       this.worker ??= new Worker(
         new URL("./background.worker.ts", import.meta.url),
         { type: "module" },
@@ -906,6 +914,8 @@ export class Editor {
           if (event.data.progress) progress(event.data.progress);
           else {
             finish();
+            worker.terminate();
+            this.worker = undefined;
             event.data.error
               ? reject(Error(event.data.error))
               : resolve(event.data);
@@ -995,10 +1005,8 @@ export class Editor {
     } finally {
       this.busy = false;
       this.emit();
-      this.workerIdle = setTimeout(() => {
-        this.worker?.terminate();
-        this.worker = undefined;
-      }, 90000);
+      this.worker?.terminate();
+      this.worker = undefined;
     }
   }
   cancelBackground() {
@@ -1007,7 +1015,6 @@ export class Editor {
   async dispose() {
     this.disposed = true;
     clearTimeout(this.timer);
-    clearTimeout(this.workerIdle);
     this.cancelInference?.();
     this.worker?.terminate();
     await this.canvas.dispose();
