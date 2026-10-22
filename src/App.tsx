@@ -354,6 +354,7 @@ export default function App() {
     run(() => ed().change(values));
   const object = state.active;
   const textObject = object instanceof Textbox;
+  const selectionFill=object instanceof ActiveSelection?object.getObjects().find(o=>!(o instanceof FabricImage))?.fill:object?.fill;
   const selectionOpacity =
     object instanceof ActiveSelection
       ? (object.getObjects()[0]?.opacity ?? 1)
@@ -1149,10 +1150,10 @@ export default function App() {
                       <input
                         type="color"
                         aria-label="Layer color"
-                        value={color(object.fill) ? object.fill : "#20211f"}
+                        value={color(selectionFill) ? selectionFill : "#20211f"}
                         onChange={(e) => change({ fill: e.target.value })}
                       />
-                      <span>{String(object.fill).toUpperCase()}</span>
+                      <span>{String(selectionFill).toUpperCase()}</span>
                       <span className="muted">100%</span>
                     </label>
                     <div className="swatches compact">

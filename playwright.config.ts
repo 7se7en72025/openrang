@@ -14,7 +14,7 @@ export default defineConfig({
       name: "chromium",
       use: {
         browserName: "chromium",
-        launchOptions: process.env.CI ? {} : { channel: "chrome" },
+        launchOptions: process.env.CI ? {} : { channel: "chrome",args:['--disable-gpu'] },
       },
     },
     { name: "firefox", use: { browserName: "firefox" } },
