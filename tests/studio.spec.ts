@@ -42,11 +42,11 @@ test("edit, undo, resize, export and restore an editable project", async ({
     .click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(
-    page.locator(".layer").filter({ hasText: "Made with OpenRang" }),
+    page.locator(".layer-select").filter({ hasText: "Made with OpenRang" }),
   ).toHaveCount(2);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(
-    page.locator(".layer").filter({ hasText: "Made with OpenRang" }),
+    page.locator(".layer-select").filter({ hasText: "Made with OpenRang" }),
   ).toHaveCount(1);
   await page.getByRole("button", { name: "Resize", exact: true }).click();
   await page.getByRole("button", { name: "Story", exact: false }).click();
@@ -60,10 +60,13 @@ test("edit, undo, resize, export and restore an editable project", async ({
   expect(png.readUInt32BE(20)).toBe(1920);
   const { bytes: json } = await exportDesign(page, "json");
   const project = JSON.parse(json.toString());
-  expect(project.width).toBe(1080);
-  expect(project.height).toBe(1920);
+  const active = project.pages.find(
+    (p: { id: string }) => p.id === project.activePageId,
+  );
+  expect(active.width).toBe(1080);
+  expect(active.height).toBe(1920);
   expect(
-    project.scene.objects.some(
+    active.scene.objects.some(
       (o: { text?: string }) => o.text === "Made with OpenRang",
     ),
   ).toBeTruthy();
@@ -74,24 +77,20 @@ test("edit, undo, resize, export and restore an editable project", async ({
   await expect(page.locator(".size-label")).toHaveText("1080 × 1920 px");
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(
-    page.locator(".layer").filter({ hasText: "Made with OpenRang" }),
+    page.locator(".layer-select").filter({ hasText: "Made with OpenRang" }),
   ).toHaveCount(1);
-  await page
-    .locator('input[type=file][accept=".json"]')
-    .setInputFiles({
-      name: "broken.json",
-      mimeType: "application/json",
-      buffer: Buffer.from('{"schemaVersion":99}'),
-    });
+  await page.locator('input[type=file][accept=".json"]').setInputFiles({
+    name: "broken.json",
+    mimeType: "application/json",
+    buffer: Buffer.from('{"schemaVersion":99}'),
+  });
   await expect(page.getByRole("status")).toContainText("Invalid project");
   await expect(page.locator(".size-label")).toHaveText("1080 × 1920 px");
-  await page
-    .locator('input[type=file][accept=".json"]')
-    .setInputFiles({
-      name: "design.json",
-      mimeType: "application/json",
-      buffer: json,
-    });
+  await page.locator('input[type=file][accept=".json"]').setInputFiles({
+    name: "design.json",
+    mimeType: "application/json",
+    buffer: json,
+  });
   await expect(page.getByRole("status")).toContainText("Project opened");
   expect(errors).toEqual([]);
 });
@@ -153,13 +152,11 @@ test("embedded image survives project roundtrip and brand palette persists", asy
     page.getByRole("button", { name: "Remove background" }),
   ).toBeVisible();
   const { bytes } = await exportDesign(page, "json");
-  await page
-    .locator('input[type=file][accept=".json"]')
-    .setInputFiles({
-      name: "with-image.json",
-      mimeType: "application/json",
-      buffer: bytes,
-    });
+  await page.locator('input[type=file][accept=".json"]').setInputFiles({
+    name: "with-image.json",
+    mimeType: "application/json",
+    buffer: bytes,
+  });
   await expect(page.getByRole("status")).toContainText("Project opened");
   await page.getByRole("button", { name: "Brand kit", exact: true }).click();
   await page.getByLabel("Kit name").fill("Test Studio");

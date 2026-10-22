@@ -1,3 +1,5 @@
+import { mapImageSources } from "./history.ts";
+
 export interface Project {
   schemaVersion: 1;
   title: string;
@@ -5,6 +7,168 @@ export interface Project {
   height: number;
   background: string;
   scene: { objects: Record<string, unknown>[] };
+}
+export interface DesignPage extends Omit<Project, "schemaVersion" | "title"> {
+  id: string;
+  name: string;
+}
+export interface DesignDocument {
+  schemaVersion: 2;
+  id: string;
+  title: string;
+  activePageId: string;
+  pages: DesignPage[];
+}
+export interface DesignSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  pageCount: number;
+  thumbnail: string;
+  trashedAt?: number;
+}
+export interface Brand {
+  name: string;
+  colors: string[];
+  font: string;
+  logo?: string;
+}
+export const embeddedImage =
+  /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+export function pageFromProject(p: Project): DesignPage {
+  return {
+    id: crypto.randomUUID(),
+    name: "Page 1",
+    width: p.width,
+    height: p.height,
+    background: p.background,
+    scene: p.scene,
+  };
+}
+export function packDocument(document: DesignDocument) {
+  const assets: Record<string, string> = {};
+  const ids = new Map<string, string>();
+  const packed = mapImageSources(document, (src) => {
+    if (!src.startsWith("data:image/")) return src;
+    let id = ids.get(src);
+    if (!id) {
+      id = String(ids.size + 1);
+      ids.set(src, id);
+      assets[id] = src;
+    }
+    return "asset:" + id;
+  });
+  return { ...packed, assets };
+}
+export function validateDocument(input: unknown): DesignDocument {
+  if (!input || typeof input !== "object")
+    throw Error("That is not an OpenRang project.");
+  const p = input as Record<string, unknown>;
+  if (p.schemaVersion === 1) {
+    const legacy = validateProject(input),
+      page = pageFromProject(legacy);
+    return {
+      schemaVersion: 2,
+      id: crypto.randomUUID(),
+      title: legacy.title,
+      activePageId: page.id,
+      pages: [page],
+    };
+  }
+  if (
+    p.schemaVersion !== 2 ||
+    typeof p.title !== "string" ||
+    p.title.length > 160 ||
+    typeof p.id !== "string" ||
+    !/^[\w-]{1,80}$/.test(p.id) ||
+    !Array.isArray(p.pages) ||
+    p.pages.length < 1 ||
+    p.pages.length > 20
+  )
+    throw Error("Invalid project. Use an OpenRang file with 1–20 pages.");
+  if (JSON.stringify(input).length > 25 * 1024 * 1024)
+    throw Error("Project files must be smaller than 25 MB.");
+  const assets = p.assets as Record<string, unknown> | undefined;
+  if (
+    assets &&
+    (typeof assets !== "object" ||
+      Array.isArray(assets) ||
+      Object.keys(assets).length > 600 ||
+      Object.entries(assets).some(
+        ([id, src]) =>
+          !/^\d{1,5}$/.test(id) ||
+          typeof src !== "string" ||
+          !embeddedImage.test(src),
+      ))
+  )
+    throw Error("Invalid embedded project assets.");
+  const pages = p.pages.map((raw: Record<string, unknown>) => {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      typeof raw.id !== "string" ||
+      !/^[\w-]{1,80}$/.test(raw.id) ||
+      typeof raw.name !== "string" ||
+      raw.name.length > 80
+    )
+      throw Error("Invalid page.");
+    const hydrated = mapImageSources(raw, (src) => {
+      if (!src.startsWith("asset:")) return src;
+      const data = assets?.[src.slice(6)];
+      if (typeof data !== "string") throw Error("A project image is missing.");
+      return data;
+    });
+    const page = validateProject({
+      ...hydrated,
+      schemaVersion: 1,
+      title: raw.name,
+    });
+    return {
+      id: raw.id,
+      name: raw.name,
+      width: page.width,
+      height: page.height,
+      background: page.background,
+      scene: page.scene,
+    };
+  });
+  if (
+    new Set(pages.map((p) => p.id)).size !== pages.length ||
+    !pages.some((page) => page.id === p.activePageId)
+  )
+    throw Error("Invalid page selection.");
+  return {
+    schemaVersion: 2,
+    id: p.id,
+    title: p.title,
+    activePageId: p.activePageId as string,
+    pages,
+  };
+}
+export function validateBrand(input: unknown): Brand {
+  const b = input as Brand;
+  if (
+    !b ||
+    typeof b !== "object" ||
+    typeof b.name !== "string" ||
+    b.name.length > 60 ||
+    !Array.isArray(b.colors) ||
+    b.colors.length < 1 ||
+    b.colors.length > 8 ||
+    !b.colors.every(color) ||
+    !fonts.includes(b.font) ||
+    (b.logo &&
+      (typeof b.logo !== "string" ||
+        b.logo.length > 18000000 ||
+        !embeddedImage.test(b.logo)))
+  )
+    throw Error("Invalid brand kit. Choose an OpenRang brand-kit JSON file.");
+  return {
+    name: b.name,
+    colors: b.colors,
+    font: b.font,
+    ...(b.logo ? { logo: b.logo } : {}),
+  };
 }
 
 export const fonts = [
@@ -40,6 +204,7 @@ const types = new Set([
   "IText",
   "Text",
   "Image",
+  "Group",
 ]);
 const numbers = new Set([
   "left",
@@ -77,6 +242,7 @@ const strings = new Set([
   "strokeLineJoin",
   "src",
   "crossOrigin",
+  "name",
 ]);
 const booleans = new Set([
   "flipX",
@@ -93,10 +259,16 @@ const booleans = new Set([
   "lockScalingY",
   "lockRotation",
   "strokeUniform",
+  "hasControls",
+  "hasBorders",
 ]);
 
 // Rebuild imported objects from known fields; never pass arbitrary Fabric class names or URLs to its loader.
-export function validateProject(input: unknown): Project {
+export function validateProject(
+  input: unknown,
+  depth = 0,
+  budget = { count: 0, groups: 0 },
+): Project {
   if (!input || typeof input !== "object")
     throw Error("That is not an OpenRang project.");
   const p = input as Project;
@@ -118,6 +290,13 @@ export function validateProject(input: unknown): Project {
   )
     throw Error("Projects can contain up to 300 layers.");
   const objects = p.scene.objects.map((raw) => {
+    if (
+      (raw?.type === "Group" ? ++budget.groups > 100 : ++budget.count > 300) ||
+      depth > 4
+    )
+      throw Error(
+        "Projects can contain up to 300 elements and 100 groups per page, with at most 4 nested groups.",
+      );
     if (!raw || typeof raw !== "object" || !types.has(String(raw.type)))
       throw Error("This project contains an unsupported layer.");
     const obj: Record<string, unknown> = { type: raw.type };
@@ -166,6 +345,40 @@ export function validateProject(input: unknown): Project {
         obj[key] = value;
       }
     }
+    if (raw.type === "Group") {
+      if (!Array.isArray(raw.objects) || !raw.objects.length)
+        throw Error("Invalid group.");
+      obj.objects = validateProject(
+        { ...p, scene: { objects: raw.objects } },
+        depth + 1,
+        budget,
+      ).scene.objects;
+    }
+    if (raw.type === "Image" && raw.filters !== undefined) {
+      if (!Array.isArray(raw.filters) || raw.filters.length > 4)
+        throw Error("Unsupported image filters.");
+      obj.filters = raw.filters.map((f: Record<string, unknown>) => {
+        if (!f || typeof f !== "object")
+          throw Error("Invalid image adjustment.");
+        const field = (
+          {
+            Brightness: "brightness",
+            Contrast: "contrast",
+            Saturation: "saturation",
+          } as Record<string, string>
+        )[String(f.type)];
+        if (
+          field &&
+          typeof f[field] === "number" &&
+          Number.isFinite(f[field]) &&
+          Math.abs(f[field]) <= 1
+        )
+          return { type: f.type, [field]: f[field] };
+        if (f.type === "Grayscale")
+          return { type: "Grayscale", mode: "average" };
+        throw Error("Unsupported image adjustment.");
+      });
+    }
     if (
       raw.type === "Image" &&
       (typeof raw.src !== "string" ||
@@ -210,7 +423,13 @@ function database() {
   return (dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("openrang", 1);
     request.onupgradeneeded = () => request.result.createObjectStore("studio");
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      request.result.onversionchange = () => {
+        request.result.close();
+        dbPromise = undefined;
+      };
+      resolve(request.result);
+    };
     request.onerror = () => {
       dbPromise = undefined;
       reject(request.error);
@@ -234,6 +453,62 @@ export async function writeLocal(key: string, value: unknown) {
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error);
   });
+}
+export async function readCurrentDocument(): Promise<unknown> {
+  const current = (await readLocal("project")) as
+    | { activeDesignId?: string }
+    | undefined;
+  if (current?.activeDesignId) {
+    const doc = await readLocal("design:" + current.activeDesignId);
+    if (!doc) throw Error("The last design could not be found.");
+    return doc;
+  }
+  return current;
+}
+export async function saveDocument(doc: DesignDocument, thumbnail: string) {
+  const packed = packDocument(doc);
+  if (new Blob([JSON.stringify(packed)]).size > 24 * 1024 * 1024)
+    throw Error(
+      "This project exceeds the 24 MB save limit. Download a backup and reduce image sizes.",
+    );
+  const db = await database();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("studio", "readwrite"),
+      store = tx.objectStore("studio");
+    store.put(packed, "design:" + doc.id);
+    store.put(
+      {
+        id: doc.id,
+        title: doc.title,
+        updatedAt: Date.now(),
+        pageCount: doc.pages.length,
+        thumbnail,
+      } satisfies DesignSummary,
+      "design-meta:" + doc.id,
+    );
+    store.put({ activeDesignId: doc.id }, "project");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+export async function listDesigns(): Promise<DesignSummary[]> {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const r = db
+      .transaction("studio")
+      .objectStore("studio")
+      .getAll(IDBKeyRange.bound("design-meta:", "design-meta:\uffff"));
+    r.onsuccess = () =>
+      resolve(r.result.sort((a, b) => b.updatedAt - a.updatedAt));
+    r.onerror = () => reject(r.error);
+  });
+}
+export async function trashDesign(id: string, trash: boolean) {
+  const key = "design-meta:" + id,
+    meta = (await readLocal(key)) as DesignSummary | undefined;
+  if (!meta) throw Error("Design not found.");
+  await writeLocal(key, { ...meta, trashedAt: trash ? Date.now() : undefined });
 }
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

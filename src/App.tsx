@@ -19,6 +19,7 @@ import {
   LayoutTemplate,
   LockKeyholeOpen,
   Maximize2,
+  Minus,
   MousePointer2,
   Palette,
   Plus,
@@ -39,7 +40,7 @@ import {
   AlignRight,
   WandSparkles,
 } from "lucide-react";
-import { FabricImage, Textbox } from "fabric";
+import { FabricImage, Textbox, ActiveSelection } from "fabric";
 import { Editor, type EditorState } from "./editor";
 import {
   color,
@@ -50,8 +51,19 @@ import {
   readLocal,
   swatches,
   writeLocal,
+  readCurrentDocument,
+  validateBrand,
+  type Brand,
 } from "./project";
 import { templates, templateProject } from "./templates";
+import {
+  ProjectsPanel,
+  PagesBar,
+  LayersPanel,
+  SelectionTools,
+  ImageTools,
+  BrandRestore,
+} from "./StudioPanels";
 
 const initial: EditorState = {
   title: "Good things",
@@ -65,8 +77,14 @@ const initial: EditorState = {
   save: "Opening studio…",
   zoom: 1,
   busy: true,
+  pages: [],
+  activePageId: "",
+  selectionCount: 0,
+  documentId: "",
+  historyBytes: 0,
 };
 type Panel =
+  | "Projects"
   | "Templates"
   | "Elements"
   | "Text"
@@ -74,6 +92,7 @@ type Panel =
   | "Brand kit"
   | "Layers";
 const panels = [
+  { name: "Projects", icon: FolderOpen },
   { name: "Templates", icon: LayoutTemplate },
   { name: "Elements", icon: Shapes },
   { name: "Text", icon: Type },
@@ -81,12 +100,6 @@ const panels = [
   { name: "Brand kit", icon: Palette },
   { name: "Layers", icon: Layers },
 ] as const;
-interface Brand {
-  name: string;
-  colors: string[];
-  font: string;
-  logo?: string;
-}
 function Modal({
   title,
   children,
@@ -107,7 +120,10 @@ function Modal({
   return (
     <dialog
       ref={ref}
-      onCancel={close}
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
       onClick={(e) => {
         if (e.target === ref.current) close();
       }}
@@ -169,9 +185,12 @@ export default function App() {
   const [resizeWidth, setResizeWidth] = useState(1080),
     [resizeHeight, setResizeHeight] = useState(1080),
     [scaleContent, setScaleContent] = useState(true);
-  const [format, setFormat] = useState<"png" | "svg" | "pdf" | "json">("png"),
+  const [format, setFormat] = useState<"png" | "jpeg" | "svg" | "pdf" | "json">(
+      "png",
+    ),
     [exportScale, setExportScale] = useState(1),
     [transparent, setTransparent] = useState(false);
+  const [allPages, setAllPages] = useState(true);
   const [brand, setBrand] = useState<Brand>({
     name: "My creative studio",
     colors: ["#f85c3a", "#3155e7", "#f7f1df", "#173e33"],
@@ -211,34 +230,28 @@ export default function App() {
       );
       editor.current = instance;
       try {
-        const saved = await readLocal("project");
+        const saved = await readCurrentDocument();
         await instance.load(saved ?? templateProject("good"));
       } catch (e) {
         notify(
           "Could not restore device storage. Starting a fresh canvas; your previous stored file is untouched.",
         );
         await instance.load(templateProject("good"), false);
+        instance.history.push(instance.document());
+        instance.save = "Restore failed · original storage preserved";
+        instance.emit();
       }
       if (cancelled) {
         await instance.dispose();
         return;
       }
-      observer = new ResizeObserver(() => instance?.fit());
+      observer = new ResizeObserver(() => instance?.fit(false));
       observer.observe(hostRef.current!);
       instance.fit();
       setReady(true);
       try {
-        const b = (await readLocal("brand")) as Brand | undefined;
-        if (
-          b &&
-          typeof b.name === "string" &&
-          Array.isArray(b.colors) &&
-          b.colors.length <= 8 &&
-          b.colors.every(color) &&
-          fonts.includes(b.font) &&
-          (!b.logo || /^data:image\/(png|jpeg|webp);base64,/.test(b.logo))
-        )
-          setBrand(b);
+        const b = await readLocal("brand");
+        if (b) setBrand(validateBrand(b));
       } catch {}
     };
     void start().catch((e) => notify(String(e)));
@@ -267,6 +280,40 @@ export default function App() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "d") {
         event.preventDefault();
         void run(() => ed.duplicate());
+      }
+      const command = event.ctrlKey || event.metaKey;
+      if (command && ["a", "c", "v", "g"].includes(event.key.toLowerCase())) {
+        event.preventDefault();
+        const key = event.key.toLowerCase();
+        void run(() =>
+          key === "a"
+            ? ed.selectAll()
+            : key === "c"
+              ? ed.copy()
+              : key === "v"
+                ? ed.paste()
+                : event.shiftKey
+                  ? ed.ungroup()
+                  : ed.group(),
+        );
+      }
+      if (
+        ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 10 : 1;
+        ed.nudge(
+          event.key === "ArrowLeft"
+            ? -step
+            : event.key === "ArrowRight"
+              ? step
+              : 0,
+          event.key === "ArrowUp"
+            ? -step
+            : event.key === "ArrowDown"
+              ? step
+              : 0,
+        );
       }
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
@@ -307,6 +354,10 @@ export default function App() {
     run(() => ed().change(values));
   const object = state.active;
   const textObject = object instanceof Textbox;
+  const selectionOpacity =
+    object instanceof ActiveSelection
+      ? (object.getObjects()[0]?.opacity ?? 1)
+      : (object?.opacity ?? 1);
   const openResize = () => {
     setResizeWidth(state.width);
     setResizeHeight(state.height);
@@ -323,7 +374,7 @@ export default function App() {
   const exportFile = async () => {
     setTask("Preparing your download…");
     try {
-      await ed().export(format, exportScale, transparent);
+      await ed().export(format, exportScale, transparent, allPages);
       notify("Your download is ready. Go make something with it.");
       setModal(null);
     } catch (e) {
@@ -380,6 +431,16 @@ export default function App() {
           <span className="free-badge">
             <LockKeyholeOpen size={13} /> Free by design
           </span>
+          <Tool
+            label="Saved designs"
+            onClick={() => {
+              setPanel("Projects");
+              setMobilePanel(true);
+            }}
+            disabled={!ready || state.busy}
+          >
+            <Layers size={18} />
+          </Tool>
           <Tool
             label="Open project"
             onClick={() => projectRef.current?.click()}
@@ -471,6 +532,14 @@ export default function App() {
             </button>
           </div>
           <div className="library-scroll">
+            {panel === "Projects" && ready && editor.current && (
+              <ProjectsPanel
+                editor={editor.current}
+                revision={state.documentId + state.save}
+                notify={notify}
+                onOpen={() => setMobilePanel(false)}
+              />
+            )}
             {panel === "Templates" && (
               <>
                 <label className="search">
@@ -505,7 +574,7 @@ export default function App() {
                       className="template-card"
                       onClick={() =>
                         run(async () => {
-                          await ed().load(templateProject(t.id));
+                          await ed().applyTemplate(templateProject(t.id));
                           setMobilePanel(false);
                         })
                       }
@@ -804,50 +873,23 @@ export default function App() {
                 >
                   <Download size={15} /> Download kit backup
                 </button>
+                <BrandRestore onImport={updateBrand} notify={notify} />
               </>
             )}
-            {panel === "Layers" && (
+            {panel === "Layers" && ready && editor.current && (
               <>
-                <p className="muted small">
-                  Top of the list = front of the canvas. Select a layer to edit,
-                  reorder or duplicate it.
-                </p>
-                <div className="layer-list">
-                  {state.layers.map((o, i) => (
-                    <button
-                      className={object === o ? "layer active" : "layer"}
-                      key={i}
-                      onClick={() => ed().select(o)}
-                    >
-                      <span className="layer-icon">
-                        {o instanceof Textbox ? (
-                          <Type size={17} />
-                        ) : o instanceof FabricImage ? (
-                          <ImagePlus size={17} />
-                        ) : (
-                          <Shapes size={17} />
-                        )}
-                      </span>
-                      <span>
-                        {o instanceof Textbox
-                          ? o.text.slice(0, 34)
-                          : o instanceof FabricImage
-                            ? "Uploaded image"
-                            : o.type}
-                      </span>
-                      {!o.selectable && <LockKeyholeOpen size={13} />}
-                    </button>
-                  ))}
-                </div>
-                {!state.layers.length && (
-                  <p className="empty">A fresh canvas. Add something good.</p>
-                )}
                 <button
                   className="secondary full"
-                  onClick={() => setPanel("Elements")}
+                  disabled={state.busy}
+                  onClick={() => ed().selectAll()}
                 >
-                  <Plus size={16} /> Add an element
+                  Select all layers
                 </button>
+                <LayersPanel
+                  editor={editor.current}
+                  state={state}
+                  onAdd={() => setPanel("Elements")}
+                />
               </>
             )}
           </div>
@@ -885,13 +927,18 @@ export default function App() {
               void upload(e.dataTransfer.files[0]);
             }}
           >
-            <div
-              className="canvas-paper"
-              style={{ pointerEvents: state.busy ? "none" : "auto" }}
-              aria-label="Design canvas"
-              aria-busy={state.busy}
-            >
-              <canvas ref={canvasRef} />
+            <div className="canvas-stage">
+              <div
+                className="canvas-paper"
+                style={{ pointerEvents: state.busy ? "none" : "auto" }}
+                aria-label="Design canvas"
+                aria-busy={state.busy}
+              >
+                <canvas
+                  ref={canvasRef}
+                  aria-label="Interactive design artwork"
+                />
+              </div>
             </div>
             {!ready && (
               <div className="loading-card">
@@ -903,9 +950,18 @@ export default function App() {
               <div className="task-card" role="status">
                 <span className="spinner" />
                 {task}
+                {state.busy && (
+                  <button
+                    className="secondary"
+                    onClick={() => ed().cancelBackground()}
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             )}
           </div>
+          <PagesBar editor={editor.current} state={state} run={run} />
           <div className="workspace-bottom">
             <span>
               <MousePointer2 size={14} />
@@ -915,17 +971,42 @@ export default function App() {
             </span>
             <div>
               <span className="page-label">
-                PAGE 01 <span>/ 01</span>
+                PAGE{" "}
+                {String(
+                  Math.max(
+                    1,
+                    state.pages.findIndex((p) => p.id === state.activePageId) +
+                      1,
+                  ),
+                ).padStart(2, "0")}{" "}
+                <span>
+                  / {String(state.pages.length || 1).padStart(2, "0")}
+                </span>
               </span>
               <span className="bottom-divider" />
+              <Tool
+                label="Zoom out"
+                disabled={!ready || state.busy}
+                onClick={() => ed().zoomBy(0.8)}
+              >
+                <Minus size={13} />
+              </Tool>
               <button
                 className="zoom-button"
                 onClick={() => ed().fit()}
                 title="Fit canvas"
+                aria-label="Fit canvas"
               >
                 <Maximize2 size={14} />
                 {Math.round(state.zoom * 100)}%
               </button>
+              <Tool
+                label="Zoom in"
+                disabled={!ready || state.busy}
+                onClick={() => ed().zoomBy(1.25)}
+              >
+                <Plus size={13} />
+              </Tool>
             </div>
           </div>
         </main>
@@ -975,6 +1056,7 @@ export default function App() {
             </div>
             {object ? (
               <>
+                <SelectionTools editor={ed()} state={state} run={run} />
                 {textObject && (
                   <>
                     <h3 className="property-label">Typography</h3>
@@ -984,6 +1066,7 @@ export default function App() {
                     <textarea
                       id="text-content"
                       className="text-content"
+                      maxLength={50000}
                       value={object.text}
                       onChange={(e) => change({ text: e.target.value })}
                     />
@@ -1086,6 +1169,7 @@ export default function App() {
                 )}
                 {object instanceof FabricImage && (
                   <>
+                    <ImageTools editor={ed()} image={object} />
                     <h3 className="property-label">Image tools</h3>
                     <button
                       className="ai-button full"
@@ -1154,7 +1238,7 @@ export default function App() {
                   ))}
                 </div>
                 <h3 className="property-label">
-                  Opacity <span>{Math.round(object.opacity * 100)}%</span>
+                  Opacity <span>{Math.round(selectionOpacity * 100)}%</span>
                 </h3>
                 <input
                   className="range"
@@ -1162,7 +1246,7 @@ export default function App() {
                   min="0"
                   max="100"
                   aria-label="Layer opacity"
-                  value={Math.round(object.opacity * 100)}
+                  value={Math.round(selectionOpacity * 100)}
                   onChange={(e) => change({ opacity: +e.target.value / 100 })}
                 />
                 <h3 className="property-label">Arrange</h3>
@@ -1196,6 +1280,19 @@ export default function App() {
               </>
             ) : (
               <>
+                <label className="field">
+                  <span>Page name</span>
+                  <input
+                    aria-label="Page name"
+                    value={
+                      state.pages.find((p) => p.id === state.activePageId)
+                        ?.name || ""
+                    }
+                    maxLength={80}
+                    disabled={!ready || state.busy}
+                    onChange={(e) => ed().renamePage(e.target.value)}
+                  />
+                </label>
                 <h3 className="property-label">Background</h3>
                 <label className="color-field">
                   <input
@@ -1301,9 +1398,9 @@ export default function App() {
             void run(async () => {
               if (file.size > 25 * 1024 * 1024)
                 throw Error("Project files must be smaller than 25 MB.");
-              await ed().load(JSON.parse(await file.text()));
+              await ed().openDocument(JSON.parse(await file.text()), true);
               notify(
-                "Project opened. Your previous canvas is available with Undo.",
+                "Project opened. Your previous design is saved in Projects.",
               );
             });
           e.target.value = "";
@@ -1416,12 +1513,13 @@ export default function App() {
               onChange={(e) => setFormat(e.target.value as typeof format)}
             >
               <option value="png">PNG — crisp, high-quality image</option>
+              <option value="jpeg">JPEG — smaller photo file</option>
               <option value="svg">SVG — scalable artwork</option>
               <option value="pdf">PDF — raster document</option>
               <option value="json">OpenRang project — keep it editable</option>
             </select>
           </label>
-          {(format === "png" || format === "pdf") && (
+          {(format === "png" || format === "jpeg" || format === "pdf") && (
             <label className="field">
               Export resolution
               <select
@@ -1446,6 +1544,19 @@ export default function App() {
               <span>
                 Transparent background <span className="free-tag">FREE</span>
                 <small>Exports without the canvas background.</small>
+              </span>
+            </label>
+          )}
+          {format === "pdf" && state.pages.length > 1 && (
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={allPages}
+                onChange={(e) => setAllPages(e.target.checked)}
+              />
+              <span>
+                Export all {state.pages.length} pages
+                <small>Each page keeps its own size.</small>
               </span>
             </label>
           )}
@@ -1504,6 +1615,12 @@ export default function App() {
             <kbd>Ctrl/⌘ Z · Shift Z</kbd>
             <span>Duplicate a layer</span>
             <kbd>Ctrl/⌘ D</kbd>
+            <span>Copy / paste layers</span>
+            <kbd>Ctrl/⌘ C · V</kbd>
+            <span>Group / ungroup</span>
+            <kbd>Ctrl/⌘ G · Shift G</kbd>
+            <span>Nudge selected</span>
+            <kbd>Arrows · Shift = 10 px</kbd>
             <span>Delete selected</span>
             <kbd>Delete</kbd>
             <span>Edit text</span>
@@ -1522,14 +1639,14 @@ export default function App() {
           <div className="tip-card">
             <h3>Your work stays on this device.</h3>
             <p>
-              The current design and brand kit autosave in this browser.
-              Clearing browser data removes them. Download editable project
-              backups for anything you want to keep.
+              Your designs and brand kit autosave in this browser. Clearing
+              browser data removes them. Download editable project backups for
+              anything you want to keep.
             </p>
             <p>
               Background removal downloads an AI model from IMG.LY; image
-              processing runs locally. This first version has one canvas per
-              project.
+              processing runs locally, in a cancellable background worker. Each
+              project supports up to 20 pages.
             </p>
           </div>
           <button className="primary full" onClick={() => setModal(null)}>

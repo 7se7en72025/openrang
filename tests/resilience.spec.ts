@@ -22,15 +22,13 @@ test("rejected embedded class and remote image leave the document intact", async
     { type: "Image", src: "https://do-not-fetch.example/image.png" },
     { type: "UnrecognizedClass", text: "untrusted" },
   ]) {
-    await page
-      .locator('input[accept=".json"]')
-      .setInputFiles({
-        name: "invalid.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(
-          JSON.stringify({ ...base, scene: { objects: [object] } }),
-        ),
-      });
+    await page.locator('input[accept=".json"]').setInputFiles({
+      name: "invalid.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({ ...base, scene: { objects: [object] } }),
+      ),
+    });
     await expect(page.getByRole("status")).toContainText(
       /Only embedded|unsupported/,
     );

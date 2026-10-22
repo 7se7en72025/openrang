@@ -9,6 +9,22 @@ test("real on-device model removes background and undo preserves original", asyn
     "Run separately with TEST_AI=1; downloads the real AI model.",
   );
   test.setTimeout(240000);
+  const missingAssets: string[] = [];
+  page.on("response", (r) => {
+    if (
+      r
+        .url()
+        .startsWith(
+          new URL(
+            page.url() === "about:blank"
+              ? process.env.STUDIO_URL || "http://127.0.0.1:5173"
+              : page.url(),
+          ).origin,
+        ) &&
+      r.status() >= 400
+    )
+      missingAssets.push(r.url());
+  });
   const photo = await request.get(
     "https://img.ly/static/ubq_samples/sample_4.jpg",
   );
@@ -26,9 +42,15 @@ test("real on-device model removes background and undo preserves original", asyn
       buffer: await photo.body(),
     });
   await page.getByRole("button", { name: "Remove background" }).click();
+  await page
+    .getByRole("button", { name: "Help and shortcuts" })
+    .click({ timeout: 3000 });
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Close dialog" }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Background removed" }),
-  ).toBeVisible({ timeout: 210000 });
+    page.getByRole("button", { name: "Export design", exact: true }),
+  ).toBeEnabled({ timeout: 210000 });
+  await expect(page.locator(".toast")).toContainText("Background removed");
   await page
     .getByRole("button", { name: "Export design", exact: true })
     .click();
@@ -39,9 +61,10 @@ test("real on-device model removes background and undo preserves original", asyn
   const p = JSON.parse(
     await fs.readFile((await (await download).path())!, "utf8"),
   );
-  const src = p.scene.objects.find(
-    (o: { type: string }) => o.type === "Image",
-  ).src;
+  const image = p.pages
+    .find((page: { id: string }) => page.id === p.activePageId)
+    .scene.objects.find((o: { type: string }) => o.type === "Image");
+  const src = p.assets[image.src.slice(6)];
   const alpha = await page.evaluate(async (s) => {
     const img = new Image();
     img.src = s;
@@ -62,9 +85,10 @@ test("real on-device model removes background and undo preserves original", asyn
   }, src);
   expect(alpha.transparent).toBeGreaterThan(100);
   expect(alpha.solid).toBeGreaterThan(100);
+  expect(missingAssets).toEqual([]);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page.getByRole("button", { name: "Layers", exact: true }).click();
   await expect(
-    page.locator(".layer").filter({ hasText: "Uploaded image" }),
+    page.locator(".layer-select").filter({ hasText: "Uploaded image" }),
   ).toHaveCount(1);
 });

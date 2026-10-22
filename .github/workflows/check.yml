@@ -10,9 +10,14 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium firefox
       - run: npm run build
+      - run: npm run test:unit
+      - run: npm run check:bundle
       - run: npm test
+        env:
+          TEST_PRODUCTION: '1'
+          TEST_AI: '1'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
