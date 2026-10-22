@@ -21,6 +21,8 @@ assert.ok(
   !files.some((name) => name.endsWith(".wasm")),
   "Unused runtime WASM should not be bundled with the CPU-only editor.",
 );
+const worker = gzipSync(readFileSync("dist/server/index.js")).length;
+assert.ok(worker < 2000000, `Cloud Worker exceeds the 2 MB gzip budget: ${worker}.`);
 const precache = JSON.parse(readFileSync("dist/precache.json", "utf8"));
 assert.ok(
   !precache.some((name) => /worker|jspdf|html2canvas|ort[.]/.test(name)),
@@ -31,6 +33,7 @@ console.log(
     {
       initialJavaScriptGzipBytes: initial,
       deployedAssetBytes: total,
+      workerGzipBytes: worker,
       precacheAssets: precache.length,
     },
     null,

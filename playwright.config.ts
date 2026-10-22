@@ -14,7 +14,9 @@ export default defineConfig({
       name: "chromium",
       use: {
         browserName: "chromium",
-        launchOptions: process.env.CI ? {} : { channel: "chrome",args:['--disable-gpu'] },
+        launchOptions: process.env.CI
+          ? {}
+          : { channel: "chrome", args: ["--disable-gpu"] },
       },
     },
     { name: "firefox", use: { browserName: "firefox" } },
@@ -22,11 +24,14 @@ export default defineConfig({
   webServer: process.env.STUDIO_URL
     ? undefined
     : {
-        command: process.env.TEST_PRODUCTION
-          ? "node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173"
-          : "node node_modules/vite/bin/vite.js --host 127.0.0.1",
+        command: process.env.TEST_CLOUD
+          ? "node checks/preview-cloud.mjs"
+          : process.env.TEST_PRODUCTION
+            ? "node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173"
+            : "node node_modules/vite/bin/vite.js --host 127.0.0.1",
         url: "http://127.0.0.1:5173",
         reuseExistingServer: !process.env.CI,
+        env: { PORT: "5173" },
       },
   reporter: "list",
 });

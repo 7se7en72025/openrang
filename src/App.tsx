@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -64,6 +71,8 @@ import {
   ImageTools,
   BrandRestore,
 } from "./StudioPanels";
+const CloudStudio = lazy(() => import("./CloudStudio"));
+const MotionStudio = lazy(() => import("./MotionStudio"));
 
 const initial: EditorState = {
   title: "Good things",
@@ -167,6 +176,48 @@ function Tool({
   );
 }
 
+function ModalHost({
+  visible,
+  close,
+  children,
+}: {
+  visible: boolean;
+  close: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current!;
+    if (visible && !dialog.open) dialog.showModal();
+    else if (!visible && dialog.open) dialog.close();
+  }, [visible]);
+  return (
+    <dialog
+      ref={ref}
+      aria-label="Cloud and team"
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
+      onClick={(e) => {
+        if (e.target === ref.current) close();
+      }}
+    >
+      <div className="dialog-head">
+        <h2>Cloud and team</h2>
+        <button
+          className="icon-button"
+          aria-label="Close dialog"
+          onClick={close}
+        >
+          <X size={19} />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null),
     hostRef = useRef<HTMLDivElement>(null),
@@ -179,7 +230,9 @@ export default function App() {
     [query, setQuery] = useState(""),
     [filter, setFilter] = useState("All");
   const [toast, setToast] = useState(""),
-    [modal, setModal] = useState<"export" | "resize" | "help" | null>(null),
+    [modal, setModal] = useState<
+      "export" | "resize" | "help" | "cloud" | "motion" | null
+    >(null),
     [task, setTask] = useState(""),
     [ready, setReady] = useState(false);
   const [resizeWidth, setResizeWidth] = useState(1080),
@@ -191,6 +244,17 @@ export default function App() {
     [exportScale, setExportScale] = useState(1),
     [transparent, setTransparent] = useState(false);
   const [allPages, setAllPages] = useState(true);
+  const [cloudLoaded, setCloudLoaded] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState({
+    message: "Optional cloud library",
+    conflict: false,
+  });
+  useEffect(() => {
+    if (ready && new URLSearchParams(location.hash.slice(1)).has("cloud")) {
+      setCloudLoaded(true);
+      setModal("cloud");
+    }
+  }, [ready]);
   const [brand, setBrand] = useState<Brand>({
     name: "My creative studio",
     colors: ["#f85c3a", "#3155e7", "#f7f1df", "#173e33"],
@@ -354,7 +418,10 @@ export default function App() {
     run(() => ed().change(values));
   const object = state.active;
   const textObject = object instanceof Textbox;
-  const selectionFill=object instanceof ActiveSelection?object.getObjects().find(o=>!(o instanceof FabricImage))?.fill:object?.fill;
+  const selectionFill =
+    object instanceof ActiveSelection
+      ? object.getObjects().find((o) => !(o instanceof FabricImage))?.fill
+      : object?.fill;
   const selectionOpacity =
     object instanceof ActiveSelection
       ? (object.getObjects()[0]?.opacity ?? 1)
@@ -470,6 +537,33 @@ export default function App() {
           >
             <Expand size={16} /> Resize
           </button>
+          <Tool
+            label="Cloud and team"
+            onClick={() => {
+              setCloudLoaded(true);
+              setModal("cloud");
+            }}
+            disabled={!ready || state.busy}
+          >
+            <Upload size={18} />
+            <span
+              className={
+                cloudStatus.conflict
+                  ? "cloud-indicator conflict"
+                  : "cloud-indicator"
+              }
+              title={cloudStatus.message}
+            >
+              {cloudStatus.conflict ? "Sync paused" : "Cloud"}
+            </span>
+          </Tool>
+          <Tool
+            label="Animate and video"
+            onClick={() => setModal("motion")}
+            disabled={!ready || state.busy}
+          >
+            <Sparkles size={18} />
+          </Tool>
           <button
             className="primary"
             onClick={() => setModal("export")}
@@ -1497,6 +1591,25 @@ export default function App() {
           </p>
         </Modal>
       )}
+      {cloudLoaded && ready && (
+        <ModalHost visible={modal === "cloud"} close={() => setModal(null)}>
+          <Suspense fallback={<p>Loading cloud library…</p>}>
+            <CloudStudio
+              editor={ed()}
+              visible={modal === "cloud"}
+              notify={notify}
+              onStatus={setCloudStatus}
+            />
+          </Suspense>
+        </ModalHost>
+      )}
+      {modal === "motion" && (
+        <Modal title="Animate your story" close={() => setModal(null)}>
+          <Suspense fallback={<p>Loading motion studio…</p>}>
+            <MotionStudio editor={ed()} notify={notify} />
+          </Suspense>
+        </Modal>
+      )}
       {modal === "export" && (
         <Modal
           title="Made by you. Ready for the world."
@@ -1507,6 +1620,9 @@ export default function App() {
           <p className="dialog-description">
             No watermarks. No upgrade button. Just your design.
           </p>
+          <button className="secondary full" onClick={() => setModal("motion")}>
+            Create an animated video instead
+          </button>
           <label className="field">
             File type
             <select
@@ -1638,11 +1754,16 @@ export default function App() {
             View the source on GitHub <ArrowRight size={15} />
           </a>
           <div className="tip-card">
-            <h3>Your work stays on this device.</h3>
+            <h3>Local by default. Cloud when you choose.</h3>
             <p>
               Your designs and brand kit autosave in this browser. Clearing
               browser data removes them. Download editable project backups for
               anything you want to keep.
+            </p>
+            <p>
+              Use Cloud and team for optional signed-in cloud saves and editor
+              invites. Animate and video turns your pages into a short, silent
+              video.
             </p>
             <p>
               Background removal downloads an AI model from IMG.LY; image

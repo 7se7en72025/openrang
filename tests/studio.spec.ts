@@ -187,6 +187,9 @@ test("templates work and mobile stays inside viewport", async ({ page }) => {
     .getByRole("button", { name: "Use In full bloom template" })
     .click();
   await expect(page.getByLabel("Design title")).toHaveValue("In full bloom");
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/editor-desktop.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
@@ -195,11 +198,22 @@ test("templates work and mobile stays inside viewport", async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     390,
   );
+  expect(
+    await page.locator(".top-actions button:visible").evaluateAll((buttons) =>
+      buttons.every((button) => {
+        const rect = button.getBoundingClientRect();
+        return rect.x >= 0 && rect.right <= innerWidth;
+      }),
+    ),
+  ).toBe(true);
   await page.getByRole("button", { name: "Templates", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Use Good things template" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Use Good things template" }).click();
   await expect(page.locator(".library")).not.toBeVisible();
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
   await page.screenshot({ path: "docs/screenshots/editor-mobile.png" });
 });

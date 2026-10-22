@@ -11,6 +11,7 @@ export interface Project {
 export interface DesignPage extends Omit<Project, "schemaVersion" | "title"> {
   id: string;
   name: string;
+  motion?: { duration: number; effect: "none" | "fade" | "slide" | "zoom" };
 }
 export interface DesignDocument {
   schemaVersion: 2;
@@ -123,6 +124,16 @@ export function validateDocument(input: unknown): DesignDocument {
       schemaVersion: 1,
       title: raw.name,
     });
+    const motion = raw.motion as DesignPage["motion"];
+    if (
+      motion &&
+      (typeof motion !== "object" ||
+        !Number.isFinite(motion.duration) ||
+        motion.duration < 1 ||
+        motion.duration > 15 ||
+        !["none", "fade", "slide", "zoom"].includes(motion.effect))
+    )
+      throw Error("Invalid page animation. Duration must be 1–15 seconds.");
     return {
       id: raw.id,
       name: raw.name,
@@ -130,6 +141,9 @@ export function validateDocument(input: unknown): DesignDocument {
       height: page.height,
       background: page.background,
       scene: page.scene,
+      ...(motion
+        ? { motion: { duration: motion.duration, effect: motion.effect } }
+        : {}),
     };
   });
   if (
@@ -456,8 +470,7 @@ export async function writeLocal(key: string, value: unknown) {
 }
 export async function readCurrentDocument(): Promise<unknown> {
   const current = (await readLocal("project")) as
-    | { activeDesignId?: string }
-    | undefined;
+    { activeDesignId?: string } | undefined;
   if (current?.activeDesignId) {
     const doc = await readLocal("design:" + current.activeDesignId);
     if (!doc) throw Error("The last design could not be found.");

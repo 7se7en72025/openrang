@@ -25,3 +25,7 @@ The editor now uses version 2 documents with shared assets and multiple pages. P
 
 Run `npm run test:unit`, `npm run build`, `npm run check:bundle` and relevant production Playwright checks. CI exercises both Chromium and Firefox, offline reload and real model inference. Do not weaken the performance budgets or replace inference tests with mocked success.
 
+Optional cloud files use Sites-authenticated identity and a private R2 bucket. Preserve same-origin writes, per-file permission checks, ETag-conditional updates, revocation and recoverable Trash. Never publish the loopback test identity adapter as hosted authentication. Keep cloud responses out of offline caches. Team sync pauses on conflicts instead of silently overwriting local edits.
+
+Page motion is persisted in version 2 documents. Video uses native browser recording with bounded duration/resolution, playable output and cancellation. Do not describe it as a full video timeline or promise MP4 on every browser.
+

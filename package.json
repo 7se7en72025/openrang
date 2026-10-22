@@ -1,13 +1,13 @@
 {
   "name": "openrang-studio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
   "description": "Your ideas. Your canvas. A free, local-first design studio.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node checks/build-worker.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
     "test:unit": "node --test checks/*.test.mjs",

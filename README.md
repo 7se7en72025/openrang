@@ -4,11 +4,11 @@
 
 [![Check the studio](https://github.com/7se7en72025/openrang/actions/workflows/check.yml/badge.svg)](https://github.com/7se7en72025/openrang/actions/workflows/check.yml)
 
-A free, open-source design studio with transparent exports, multi-page projects, brand kits and real on-device background removal.
+A free, open-source design studio with transparent exports, multi-page projects, brand kits, on-device background removal, optional cloud/team sync and animated video exports.
 
 ![OpenRang editor](docs/screenshots/editor-desktop.png)
 
-**No account. No watermark. No API key.** Your designs and photos stay in your browser. OpenRang is independent of Canva and does not import its proprietary files or assets.
+**No watermark. No API key.** The local editor needs no account. Designs stay in your browser unless you explicitly save them to cloud. OpenRang is independent of Canva and does not import its proprietary files or assets.
 
 ## Create, save, come back tomorrow
 
@@ -21,6 +21,8 @@ A free, open-source design studio with transparent exports, multi-page projects,
 - Remove photo backgrounds with real AI in a cancellable worker. Your original stays recoverable with Undo.
 - Keep a brand kit with colors, a font and a logo; download and restore its backup.
 - Export transparent PNG, JPEG, SVG, multi-page PDF or an editable OpenRang project.
+- Animate pages with fade, rise or zoom; preview and download a short video.
+- Optionally sign in, save cloud designs, invite editors, sync team changes and revoke access. Conflicts preserve your local edits.
 - Edit offline after the first successful online visit. Install the web app where your browser supports it.
 
 ## Run it
@@ -41,11 +43,13 @@ npm run build
 npm run preview
 ```
 
-Serve `dist/` over HTTPS on a static host. No server, database, paid service or secrets are needed. Fonts are bundled. The offline service worker is enabled in production, on HTTPS or localhost.
+For the local editor, serve the top-level frontend files in `dist/` over HTTPS on any static host; exclude `server/` and `.openai/` from that static upload. No backend or secrets are needed for local tools. Fonts are bundled. The offline service worker is enabled in production, on HTTPS or localhost.
+
+For optional cloud features, the build also produces a standalone Sites Worker at `dist/server/index.js`. Sites supplies trusted signed-in identity and provisions the `BUCKET` R2 binding declared in `.openai/hosting.json`. See [cloud hosting and its trust boundary](docs/cloud.md). Do not expose this Worker directly on a host that accepts untrusted identity headers.
 
 ## Your work is local
 
-Designs and the brand kit live in IndexedDB on this device. **Download project backups for important work.** Clearing site data removes the local library; this is not cloud storage.
+Designs and the brand kit autosave in IndexedDB on this device. **Download project backups for important work.** Clearing site data removes the local library. Cloud storage is opt-in, through **Cloud and team**; local autosave and cloud save have separate status messages.
 
 File imports stage their contents before replacing the canvas. Switching designs waits for the current save. Autosave failures are shown rather than reported as success. Version 1 project files are migrated to the multi-page format; imported copies receive a separate library identity.
 
@@ -60,6 +64,10 @@ Trash is recoverable. Open another design before moving the currently open desig
 **Export:** PNG/JPEG at 1×, 2× or 3×, transparent PNG/SVG, and all pages in one PDF. SVG retains font names, so the receiving device needs those fonts. PDF embeds RGB raster pages; CMYK, bleed and editable PDF text are not supported.
 
 **Offline:** the core editor, bundled fonts, local library and PNG/JPEG/SVG/project downloads work after core assets are cached. PDF and AI may need an online first use. Offline readiness depends on the browser completing installation and retaining its cache.
+
+**Cloud and team:** save a design, open it from another signed-in device, or create a seven-day editor invite. Up to 20 collaborators can edit a design. Changes sync every four seconds while the connected tab is visible; reopen a cloud design after a page reload. Concurrent whole-document changes pause sync for an explicit choice: keep the local version as a new cloud file, or back up local edits and open the cloud version. Owners can revoke all team access and recover cloud designs from Trash. This is revision-protected file sync, without shared cursors or automatic merging of simultaneous edits.
+
+**Animate and video:** page order is the storyboard. Each page has a 1–15 second duration and a still, fade, rise or zoom effect. Record a silent video up to 60 seconds, 1,920 px per side and 1,080p pixel area. Mixed-size pages fit within the first page’s aspect ratio. Recording takes real time and the tab must remain visible. The browser chooses supported WebM or MP4; there is no guaranteed MP4, audio mixing or clip timeline.
 
 ## Checks
 
@@ -76,14 +84,14 @@ Local Chromium tests use installed Google Chrome; CI uses bundled Chromium. Fire
 To exercise the actual production build, offline reload and real AI:
 
 ```sh
-TEST_PRODUCTION=1 TEST_AI=1 npm test
+TEST_PRODUCTION=1 TEST_AI=1 TEST_CLOUD=1 npm test
 ```
 
-PowerShell: set `$env:TEST_PRODUCTION='1'` and `$env:TEST_AI='1'` first. CI builds the application and exercises this same production path. Tests cover project migration, image sharing, undo, multi-page PDF, crop/filter persistence, group geometry, storage failures, rejected imports, library recovery, responsive layout, worker cancellation, real inference and offline editing.
+PowerShell: set `$env:TEST_PRODUCTION='1'`, `$env:TEST_AI='1'` and `$env:TEST_CLOUD='1'` first. The cloud QA server uses the actual built Worker with an ephemeral R2 contract adapter and test identities on loopback only. CI exercises this production code path in Chromium and Firefox, including actual inference, two-user sync/conflicts/revocation, playable animated video and cancellation. This adapter does not replace hosted R2 verification.
 
 ## Optimization with evidence
 
-The supported CPU inference build omits the unused GPU fallback binary and shares its runtime imports: deployed asset bytes dropped from **27.2 MB to about 2.51 MB** in the recorded build. This is a roughly **91% artifact-size reduction**, not a claim about initial-load speed.
+The supported CPU inference build omits the unused GPU fallback binary and shares its runtime imports. Frontend assets total about **2.53 MB**, with about **173 kB gzip** of initial JavaScript. The optional hosted Worker embeds those assets and adds about **1.31 MB gzip** of server code; it is not downloaded as initial browser JavaScript. Cloud and video controls load on demand.
 
 Photos are interned once in Undo history and once in project files even when shared across pages. Typing/slider changes coalesce, persistence is debounced, library listings load small metadata records, and PNG/JPEG export uses Blobs.
 
@@ -91,12 +99,13 @@ See [performance measurements and budgets](docs/performance.md) and [verificatio
 
 ## Boundaries
 
-OpenRang is a complete local design workflow, not full Canva parity. It has no cloud sync, live collaboration, video/animation editor, stock-media library, generative-image service or proprietary-format import. Safari and real mobile hardware remain unverified.
+OpenRang provides a complete design/save/export workflow with optional team sync and page-animation video. It does not provide Canva file compatibility, a stock-media library, generative-image service, simultaneous conflict-free co-editing or a full video timeline. Safari and real mobile hardware remain unverified.
 
 - Canvas: 100–6,000 px per side, up to 20 pages.
 - Per page: 300 elements, 100 groups, at most four nested group levels.
 - Images: PNG/JPEG/WebP, up to 12 MB and 25 megapixels.
 - Saved projects: 24 MB; imported files: 25 MB. Embedded assets are shared.
+- Cloud files: 8 MB each, up to 100 owned files including recoverable Trash. Limits keep request memory bounded. Cloud availability and storage costs depend on the host.
 - Raster exports: up to 40 megapixels per page.
 - History: up to 50 snapshots with an approximate 48 MB string-data budget; at least two snapshots are retained. Large documents can still use significant memory.
 - One local brand kit. No custom font upload.
@@ -111,6 +120,8 @@ React + TypeScript + Vite, Fabric.js, IndexedDB, jsPDF and IMG.LY/ONNX Runtime. 
 - `src/history.ts`: shared-image undo snapshots.
 - `src/StudioPanels.tsx`: projects, pages, layers, crop/adjustments and brand restore.
 - `src/background.worker.ts`: isolated CPU segmentation.
+- `src/CloudStudio.tsx` and `cloud/api.mjs`: optional cloud/team UI and permission-checked R2 file storage.
+- `src/MotionStudio.tsx`, `src/video.ts`, `src/motion.ts`: page animations and native browser recording.
 - `src/App.tsx`: editor shell and properties.
 
 [REA research notes](docs/research/canva-investigation.md) record a real Canva capture that reached a Cloudflare challenge. Live editor behavior was not verified; Canva internals were not copied.

@@ -2085,3 +2085,120 @@ dialog::backdrop {
     gap: 6px;
   }
 }
+/* Optional studios share the editor's compact dialog controls. */
+.video-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  margin: 16px auto;
+  background: #20211f;
+  border-radius: 12px;
+}
+.motion-studio > button,
+.cloud-studio > button {
+  margin-top: 10px;
+}
+.cloud-status {
+  border: 1px solid var(--line, #ddd);
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.cloud-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+.cloud-library {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+}
+.cloud-file {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.cloud-file small {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.cloud-conflict {
+  border: 1px solid #f85c3a;
+  padding: 12px;
+  border-radius: 12px;
+}
+.cloud-indicator {
+  font-size: 11px;
+  margin-left: 4px;
+}
+.cloud-indicator.conflict {
+  color: #b42c15;
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .topbar {
+    height: 100px;
+    min-height: 100px;
+    padding: 9px 12px;
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 6px;
+  }
+  .topbar .brand {
+    flex-basis: auto;
+  }
+  .topbar .document-title {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    text-align: right;
+  }
+  .topbar .document-title input {
+    font-size: 11px;
+    text-align: right;
+  }
+  .topbar .save-status {
+    justify-content: flex-end;
+    font-size: 9px;
+    overflow: hidden;
+  }
+  .top-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .top-actions .icon-button {
+    width: 33px;
+    height: 38px;
+  }
+  .top-actions .primary {
+    height: 38px;
+  }
+  .library,
+  .properties {
+    top: 100px;
+  }
+}
+@media (min-width: 1101px) {
+  .top-actions .icon-button:has(.cloud-indicator) {
+    width: auto;
+    padding: 0 8px;
+  }
+}
+@media (max-width: 1100px) {
+  .cloud-indicator {
+    display: none;
+  }
+  .top-actions .icon-button:has(.cloud-indicator.conflict) {
+    color: #b42c15;
+    background: #fff0e9;
+  }
+}

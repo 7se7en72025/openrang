@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- Optional signed-in cloud library backed by R2, including recoverable cloud Trash.
+- Revocable seven-day editor invitations, up to 20 collaborators and automatic four-second sync in an active connected tab.
+- Atomic ETag-conditional writes prevent simultaneous edits from silently overwriting each other. Conflict recovery saves a separate local backup or creates a new cloud design.
+- Owner-only team revocation and server-side permission checks on every file operation.
+- Page durations and still/fade/rise/zoom animation persisted in editable projects.
+- Preview/download native browser video, with cancellation, a 60-second limit and bounded output resolution.
+- Lazy-load cloud/video tools; preserve frontend budgets and add a 2 MB gzip Worker budget.
+- Production Worker browser coverage for two-account sync, conflicts, revoked access, animated video playback and cancellation.
+
 ## 0.2.0
 
 - Saved-design library with thumbnails, duplication and recoverable Trash.

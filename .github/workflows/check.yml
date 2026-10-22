@@ -18,6 +18,7 @@ jobs:
         env:
           TEST_PRODUCTION: '1'
           TEST_AI: '1'
+          TEST_CLOUD: '1'
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

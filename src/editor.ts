@@ -101,6 +101,7 @@ export class Editor {
   activePageId = "";
   pages: DesignPage[] = [];
   busy = false;
+  revision = 0;
   save = "Opening studio…";
   zoom = 1;
   private timer?: ReturnType<typeof setTimeout>;
@@ -350,7 +351,15 @@ export class Editor {
     this.canvas.requestRenderAll();
     this.emit();
   }
+  setMotion(motion: NonNullable<DesignPage["motion"]>) {
+    if (this.busy) return;
+    this.pages = this.pages.map((p) =>
+      p.id === this.activePageId ? { ...p, motion } : p,
+    );
+    this.commit("motion");
+  }
   private autosave() {
+    ++this.revision;
     this.save = "Saving…";
     ++this.saveVersion;
     clearTimeout(this.timer);
