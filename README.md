@@ -28,6 +28,8 @@ Source: [7se7en72025/openrang](https://github.com/7se7en72025/openrang).
 Use Node.js 24 LTS and npm.
 
 ```sh
+git clone https://github.com/7se7en72025/openrang.git
+cd openrang
 npm ci
 npm run dev
 ```
@@ -78,7 +80,7 @@ Initial release, not full Canva Pro parity. One canvas per project, one local br
 - Canvas: 100–6,000 px per side, 300 layers, roughly 25 MB per project, 40 megapixels per raster export.
 - History: up to 30 snapshots / about 24 MB serialized, retaining at least two. Large images use significant memory.
 - Autosave waits 450 ms after editing. Keep the tab open until the save indicator confirms completion; leaving during a pending save or AI operation triggers a browser warning.
-- Local Chrome tests were run. The supplied GitHub CI workflow has not run remotely; Safari and Firefox are unverified.
+- Local Chrome tests and [GitHub Chromium CI](https://github.com/7se7en72025/openrang/actions/runs/39756062842) passed. Safari and Firefox are unverified.
 
 ## Architecture
 

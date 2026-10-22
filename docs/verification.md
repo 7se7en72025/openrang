@@ -14,4 +14,6 @@ Verified locally on Windows with installed Google Chrome:
 
 Background-removal verification checks both transparent and solid pixels in actual inference output. This verifies the integration works on this machine; it does not establish segmentation quality for all images or performance on phones.
 
-The latest source is checked again during publication. Safari, Firefox, mobile hardware and GitHub-hosted CI were not part of the local checks. See README for feature limits.
+The final application source also passed [GitHub-hosted Chromium CI](https://github.com/7se7en72025/openrang/actions/runs/39756062842), including a clean npm install, production build and standard browser suite. The network/model test was verified separately on the local production bundle.
+
+Safari, Firefox and mobile hardware were not checked. See README for feature limits.
