@@ -29,3 +29,5 @@ Optional cloud files use Sites-authenticated identity and a private R2 bucket. P
 
 Page motion is persisted in version 2 documents. Video uses native browser recording with bounded duration/resolution, playable output and cancellation. Do not describe it as a full video timeline or promise MP4 on every browser.
 
+Version 2 projects may embed custom fonts alongside shared image assets. Preserve font identities, native loading before text measurement, SVG embedding, brand-kit portability and font pooling in history. Invalid or tampered font data must preserve the current canvas. Asset-library blob/index changes must remain atomic across tabs; removing library assets must not remove copies already embedded in projects. Keep authored templates editable at their real format dimensions.
+

@@ -1,6 +1,6 @@
 # Performance checks
 
-Measured from the local Vite production build on 22 October 2026. These are artifact sizes and an explicit data-structure check, not Lighthouse scores or claims about every user's hardware.
+The v0.2/v0.3 baselines were measured on 22 October 2026 and the v0.4 build on 23 October 2026. These are artifact sizes and explicit data-structure checks, not Lighthouse scores or claims about every user's hardware.
 
 | Metric                                                                     |                                  Result |
 | -------------------------------------------------------------------------- | --------------------------------------: |
@@ -11,6 +11,7 @@ Measured from the local Vite production build on 22 October 2026. These are arti
 | First-load cache                                                           | Core application, CSS and bundled fonts |
 | v0.3 frontend assets, including optional cloud/video UI                     |                           about 2.53 MB |
 | v0.3 standalone Worker with embedded assets, gzip                           |                           about 1.31 MB |
+| v0.4 frontend assets / initial JavaScript gzip                              |                    2.56 MB / 181 kB |
 
 The removed 23.9 MB WASM file was the unused GPU fallback. The supported CPU path explicitly receives runtime asset URLs from IMG.LY. The full CPU-capable JavaScript backend is retained for compatibility; the deployment omits its unused GPU fallback artifact. Real-inference tests also check for missing local assets. This is a deployment-size improvement, not a 91% initial-JavaScript reduction. AI model/runtime downloads still happen on first use and are not included in these figures.
 
@@ -19,6 +20,8 @@ The removed 23.9 MB WASM file was the unused GPU fallback. The supported CPU pat
 History interns image strings once and retains small document snapshots with asset references. The model test keeps a 1,000,000-character image string through 50 states with an estimated serialized/string footprint below 2.1 MB, versus roughly 100 MB if every state retained its own UTF-16 image copy. This estimate excludes engine-specific object overhead and is not a heap profiler measurement. Old unreferenced assets are released when history is trimmed.
 
 Typing and sliders coalesce nearby changes, local persistence is debounced, library listings load metadata rather than all full-size documents, and imports stage objects before replacing the current canvas. PNG/JPEG export uses a Blob rather than building an extra base64 string.
+
+Custom font data shares the same history/project asset pool as photos. Native font faces are decoded before canvas text is measured, and faces outside the current project are released. The reusable library reads only its small index/thumbnails while browsing; full files load on demand. Cross-tab file/index writes use a single IndexedDB transaction.
 
 AI inference lives in a dedicated worker and uses transferable pixel buffers. The real-model browser test opens and closes Help during inference to check that controls remain usable. The worker is terminated after each result, error or cancellation, releasing model memory before the main thread encodes the final image. This favors lower peak memory over keeping a warm model between edits.
 

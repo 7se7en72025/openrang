@@ -12,10 +12,13 @@ A free, open-source design studio with transparent exports, multi-page projects,
 
 ## Create, save, come back tomorrow
 
-- Start with eight original templates, or a blank canvas.
+- Start with 20 original starting designs, including blank: posts/stories, thumbnails, slides, cards, menus, a resume and letterhead.
 - Save multiple designs in a local library; duplicate, search, trash and restore them.
 - Use up to 20 pages per design. Add, duplicate, name, reorder and undo deletion.
 - Edit text, shapes and photos with transforms, alignment, named layers, hide/show, lock and group/ungroup.
+- Upload custom fonts; embed them in editable projects and SVG, or reuse them through your brand kit and local library.
+- Add outlines, shadows, letter/line spacing, underline and strikethrough; effects survive project import/export.
+- Browse a searchable local photo/font library and add six original editable graphics.
 - Copy/paste, duplicate and nudge layers with keyboard shortcuts; zoom and scroll for detailed edits.
 - Crop photos to useful ratios, reposition the crop, flip, and adjust brightness, contrast, saturation or grayscale.
 - Remove photo backgrounds with real AI in a cancellable worker. Your original stays recoverable with Undo.
@@ -61,7 +64,11 @@ Trash is recoverable. Open another design before moving the currently open desig
 
 **Resize:** custom sizes with proportional fit-and-center scaling. This does not automatically redesign a composition.
 
-**Export:** PNG/JPEG at 1×, 2× or 3×, transparent PNG/SVG, and all pages in one PDF. SVG retains font names, so the receiving device needs those fonts. PDF embeds RGB raster pages; CMYK, bleed and editable PDF text are not supported.
+**Export:** PNG/JPEG at 1×, 2× or 3×, transparent PNG/SVG, and all pages in one PDF. SVG embeds uploaded fonts; built-in fonts retain their names and must be installed on the receiving device. PDF embeds RGB raster pages; CMYK, bleed and editable PDF text are not supported.
+
+**Custom typography:** upload WOFF2/WOFF/TTF/OTF files that you have permission to use and share. Fonts load before text is measured and are pooled once in history/project assets. Up to eight per project or kit, 2 MB per file and 6 MB of embedded font data. Switch text to another font before removing an in-use project font; library/kit removal leaves existing projects intact.
+
+**Reusable assets:** up to 40 local photos/fonts and 64 MB. Listings read thumbnails/metadata and load full files on demand. Uploads/removals update the file and index in one IndexedDB transaction, including when two tabs save together. Removing a library item preserves embedded copies in existing designs. Projects/brand kits provide portable backups.
 
 **Offline:** the core editor, bundled fonts, local library and PNG/JPEG/SVG/project downloads work after core assets are cached. PDF and AI may need an online first use. Offline readiness depends on the browser completing installation and retaining its cache.
 
@@ -91,7 +98,7 @@ PowerShell: set `$env:TEST_PRODUCTION='1'`, `$env:TEST_AI='1'` and `$env:TEST_CL
 
 ## Optimization with evidence
 
-The supported CPU inference build omits the unused GPU fallback binary and shares its runtime imports. Frontend assets total about **2.53 MB**, with about **173 kB gzip** of initial JavaScript. The optional hosted Worker embeds those assets and adds about **1.31 MB gzip** of server code; it is not downloaded as initial browser JavaScript. Cloud and video controls load on demand.
+The supported CPU inference build omits the unused GPU fallback binary and shares its runtime imports. Frontend assets total about **2.56 MB**, with about **181 kB gzip** of initial JavaScript. The optional hosted Worker embeds those assets and adds about **1.32 MB gzip** of server code; it is not downloaded as initial browser JavaScript. Cloud and video controls load on demand.
 
 Photos are interned once in Undo history and once in project files even when shared across pages. Typing/slider changes coalesce, persistence is debounced, library listings load small metadata records, and PNG/JPEG export uses Blobs.
 
@@ -108,7 +115,7 @@ OpenRang provides a complete design/save/export workflow with optional team sync
 - Cloud files: 8 MB each, up to 100 owned files including recoverable Trash. Limits keep request memory bounded. Cloud availability and storage costs depend on the host.
 - Raster exports: up to 40 megapixels per page.
 - History: up to 50 snapshots with an approximate 48 MB string-data budget; at least two snapshots are retained. Large documents can still use significant memory.
-- One local brand kit. No custom font upload.
+- One local brand kit, including optional embedded custom fonts.
 - Autosave waits 450 ms; keep the tab open until it confirms completion.
 
 ## Architecture and contributing
@@ -119,6 +126,7 @@ React + TypeScript + Vite, Fabric.js, IndexedDB, jsPDF and IMG.LY/ONNX Runtime. 
 - `src/project.ts`: validation, migration, asset packing and atomic local persistence.
 - `src/history.ts`: shared-image undo snapshots.
 - `src/StudioPanels.tsx`: projects, pages, layers, crop/adjustments and brand restore.
+- `src/DesignTools.tsx`, `src/assets.ts`, `src/fonts.ts`: effects/typography, transactional assets and native font loading.
 - `src/background.worker.ts`: isolated CPU segmentation.
 - `src/CloudStudio.tsx` and `cloud/api.mjs`: optional cloud/team UI and permission-checked R2 file storage.
 - `src/MotionStudio.tsx`, `src/video.ts`, `src/motion.ts`: page animations and native browser recording.
@@ -127,3 +135,5 @@ React + TypeScript + Vite, Fabric.js, IndexedDB, jsPDF and IMG.LY/ONNX Runtime. 
 [REA research notes](docs/research/canva-investigation.md) record a real Canva capture that reached a Cloudflare challenge. Live editor behavior was not verified; Canva internals were not copied.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [CHANGELOG.md](CHANGELOG.md). **AGPL-3.0-only**; upstream notices are in [NOTICE.md](NOTICE.md) and `public/licenses/`. Original templates may be used in your exported designs.
+
+See the [design-tools completion checklist](docs/completion.md) for the agreed scope, verification and supported limits.

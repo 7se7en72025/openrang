@@ -37,7 +37,8 @@ export class History {
   push(value: unknown, mergeKey = "") {
     const snapshot = JSON.stringify(
       mapImageSources(value, (src) => {
-        if (!src.startsWith("data:image/")) return src;
+        if (!src.startsWith("data:image/") && !src.startsWith("data:font/"))
+          return src;
         let id = this.assetIds.get(src);
         if (!id) {
           id = String(++this.nextId);

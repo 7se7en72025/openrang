@@ -1,10 +1,10 @@
-# Release verification — 0.3.0
+# Release verification — 0.4.0
 
-The release workflow builds the actual production Worker, enforces bundle budgets and exercises 18 browser scenarios in both Chromium and Firefox. See the [current workflow results](https://github.com/7se7en72025/openrang/actions/workflows/check.yml) for the exact source commit and run status.
+The release workflow builds the actual production Worker, enforces bundle budgets and exercises 23 browser scenarios in both Chromium and Firefox. See the [current workflow results](https://github.com/7se7en72025/openrang/actions/workflows/check.yml) for the exact source commit and run status.
 
 ## Data and history checks
 
-Nine Node tests cover version 1 migration, shared-image packing, image/brand validation, coalesced history, undo branches, unreferenced-asset cleanup, motion bounds/persistence and cloud permissions/concurrency/Trash. A one-million-character image string is retained once across 50 history states.
+Twelve Node tests cover legacy migration, shared image/font pooling, validation, coalesced history, undo branches, authored layouts/graphics, motion and cloud permissions/concurrency/Trash. A one-million-character image string is retained once across 50 history states.
 
 ## Production browser checks
 
@@ -22,6 +22,10 @@ Nine Node tests cover version 1 migration, shared-image packing, image/brand val
 - Offline reload, editing, saving and another offline reload after service-worker readiness.
 - Two isolated test accounts: private cloud save, invite acceptance, automatic sync with the dialog closed, manual sync, explicit conflict backup and owner revocation.
 - Real canvas recording: playable video with correct dimensions and different animated frames, downloadable bytes, saved page settings and cancellation.
+- Actual uploaded WOFF2 font: native decoding, SVG embedding, project reload/import, brand reuse, safe removal/Undo and tamper rejection.
+- Outline, drop shadow, line/letter spacing and decorations surviving project roundtrip.
+- Every new template format's real dimensions and editable text.
+- Library reuse/removal, two-tab uploads and transaction rollback after an index-write failure.
 
 Local checks use installed Chrome and Playwright Firefox. On this resource-constrained Windows machine, Chrome's headless test uses software rendering; CI uses default bundled Chromium. Temporary test profiles were placed on a drive with sufficient space. These are test-environment settings, not requirements imposed on people using the editor.
 

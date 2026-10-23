@@ -10,7 +10,11 @@ import {
   Group,
   ActiveSelection,
   filters,
+  Shadow,
 } from "fabric";
+import { type EmbeddedFont, validateFonts } from "./font-data";
+import { loadFonts, retainFonts } from "./fonts";
+import { makeGraphic } from "./graphics";
 import {
   type Project,
   type DesignDocument,
@@ -100,6 +104,7 @@ export class Editor {
   documentId: string = crypto.randomUUID();
   activePageId = "";
   pages: DesignPage[] = [];
+  fonts: EmbeddedFont[] = [];
   busy = false;
   revision = 0;
   save = "Opening studio…";
@@ -225,6 +230,7 @@ export class Editor {
       title: this.title,
       activePageId: this.activePageId,
       pages,
+      ...(this.fonts.length ? { fonts: this.fonts } : {}),
     };
   }
   async load(input: unknown, remember = true) {
@@ -241,6 +247,7 @@ export class Editor {
       renderOnAddRemove: false,
     });
     try {
+      await loadFonts(doc.fonts ?? []);
       await staging.loadFromJSON(p.scene);
       if (this.disposed) return;
       const objects = staging.getObjects();
@@ -250,6 +257,8 @@ export class Editor {
       this.title = doc.title;
       this.documentId = doc.id;
       this.pages = doc.pages;
+      this.fonts = doc.fonts ?? [];
+      retainFonts(this.fonts);
       this.activePageId = doc.activePageId;
       this.width = p.width;
       this.height = p.height;
@@ -411,6 +420,13 @@ export class Editor {
     if (this.busy) return;
     const o = this.canvas.getActiveObject();
     if (!o) return;
+    if (values.shadow && !(values.shadow instanceof Shadow))
+      values = {
+        ...values,
+        shadow: new Shadow(
+          values.shadow as ConstructorParameters<typeof Shadow>[0],
+        ),
+      };
     if (typeof values.text === "string" && values.text.length > 50000)
       throw Error("Text layers are limited to 50,000 characters.");
     if (o instanceof Group && "fill" in values) recolor(o, values.fill);
@@ -468,7 +484,20 @@ export class Editor {
       throw Error(
         "This project is getting large. Use a smaller image or start a new project.",
       );
+    const documentId = this.documentId,
+      pageId = this.activePageId;
     const image = await FabricImage.fromURL(src);
+    if (
+      this.disposed ||
+      this.busy ||
+      this.documentId !== documentId ||
+      this.activePageId !== pageId
+    ) {
+      image.dispose();
+      throw Error(
+        "The page changed while the image loaded. Add it again on this page.",
+      );
+    }
     image.scale(
       Math.min(
         (this.width * 0.7) / image.width,
@@ -478,6 +507,64 @@ export class Editor {
     image.set({ left: this.width * 0.15, top: this.height * 0.15 });
     this.canvas.add(image);
     this.canvas.setActiveObject(image);
+    this.commit();
+  }
+  addGraphic(id: string) {
+    if (this.busy) return;
+    const object = makeGraphic(id, "#3155e7");
+    if (
+      countElements(this.canvas.getObjects()) + countElements([object]) > 300 ||
+      countGroups(this.canvas.getObjects()) + countGroups([object]) > 100
+    )
+      throw Error("This page has reached its layer/group limit.");
+    object.scaleToWidth(Math.min(this.width, this.height) * 0.3);
+    object.set({
+      left: this.width * 0.3,
+      top: this.height * 0.3,
+      name: id + " graphic",
+    });
+    this.canvas.add(object);
+    this.canvas.setActiveObject(object);
+    this.commit();
+  }
+  async useFont(font: EmbeddedFont) {
+    if (this.busy) throw Error("Wait for the current operation.");
+    const next = validateFonts([
+      ...this.fonts.filter((f) => f.family !== font.family),
+      font,
+    ]);
+    this.busy = true;
+    this.emit();
+    try {
+      await loadFonts(next);
+      this.fonts = next;
+      retainFonts(next);
+      const object = this.canvas.getActiveObject();
+      if (object instanceof Textbox) {
+        object.set("fontFamily", font.family);
+        object.initDimensions();
+        object.setCoords();
+      }
+      this.commit();
+    } finally {
+      this.busy = false;
+      this.emit();
+    }
+  }
+  removeFont(family: string) {
+    if (this.busy) return;
+    const used = (objects: Record<string, unknown>[]): boolean =>
+      objects.some(
+        (o) =>
+          o.fontFamily === family ||
+          (Array.isArray(o.objects) && used(o.objects)),
+      );
+    if (this.document().pages.some((p) => used(p.scene.objects)))
+      throw Error(
+        "Switch text using this font to another font before removing it from the project.",
+      );
+    this.fonts = this.fonts.filter((f) => f.family !== family);
+    retainFonts(this.fonts);
     this.commit();
   }
   remove() {

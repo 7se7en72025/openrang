@@ -1,4 +1,5 @@
 import { mapImageSources } from "./history.ts";
+import { embeddedFont, validateFonts, type EmbeddedFont } from "./font-data.ts";
 
 export interface Project {
   schemaVersion: 1;
@@ -19,6 +20,7 @@ export interface DesignDocument {
   title: string;
   activePageId: string;
   pages: DesignPage[];
+  fonts?: EmbeddedFont[];
 }
 export interface DesignSummary {
   id: string;
@@ -33,6 +35,7 @@ export interface Brand {
   colors: string[];
   font: string;
   logo?: string;
+  fonts?: EmbeddedFont[];
 }
 export const embeddedImage =
   /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -50,7 +53,8 @@ export function packDocument(document: DesignDocument) {
   const assets: Record<string, string> = {};
   const ids = new Map<string, string>();
   const packed = mapImageSources(document, (src) => {
-    if (!src.startsWith("data:image/")) return src;
+    if (!src.startsWith("data:image/") && !src.startsWith("data:font/"))
+      return src;
     let id = ids.get(src);
     if (!id) {
       id = String(ids.size + 1);
@@ -99,10 +103,17 @@ export function validateDocument(input: unknown): DesignDocument {
         ([id, src]) =>
           !/^\d{1,5}$/.test(id) ||
           typeof src !== "string" ||
-          !embeddedImage.test(src),
+          !(embeddedImage.test(src) || embeddedFont.test(src)),
       ))
   )
     throw Error("Invalid embedded project assets.");
+  const hydrate = (src: string) => {
+    if (!src.startsWith("asset:")) return src;
+    const data = assets?.[src.slice(6)];
+    if (typeof data !== "string") throw Error("A project asset is missing.");
+    return data;
+  };
+  const customFonts = validateFonts(mapImageSources(p.fonts, hydrate));
   const pages = p.pages.map((raw: Record<string, unknown>) => {
     if (
       !raw ||
@@ -119,11 +130,16 @@ export function validateDocument(input: unknown): DesignDocument {
       if (typeof data !== "string") throw Error("A project image is missing.");
       return data;
     });
-    const page = validateProject({
-      ...hydrated,
-      schemaVersion: 1,
-      title: raw.name,
-    });
+    const page = validateProject(
+      {
+        ...hydrated,
+        schemaVersion: 1,
+        title: raw.name,
+      },
+      0,
+      undefined,
+      customFonts.map((f) => f.family),
+    );
     const motion = raw.motion as DesignPage["motion"];
     if (
       motion &&
@@ -157,10 +173,12 @@ export function validateDocument(input: unknown): DesignDocument {
     title: p.title,
     activePageId: p.activePageId as string,
     pages,
+    ...(customFonts.length ? { fonts: customFonts } : {}),
   };
 }
 export function validateBrand(input: unknown): Brand {
   const b = input as Brand;
+  const customFonts = validateFonts(b?.fonts);
   if (
     !b ||
     typeof b !== "object" ||
@@ -170,7 +188,7 @@ export function validateBrand(input: unknown): Brand {
     b.colors.length < 1 ||
     b.colors.length > 8 ||
     !b.colors.every(color) ||
-    !fonts.includes(b.font) ||
+    ![...fonts, ...customFonts.map((f) => f.family)].includes(b.font) ||
     (b.logo &&
       (typeof b.logo !== "string" ||
         b.logo.length > 18000000 ||
@@ -182,6 +200,7 @@ export function validateBrand(input: unknown): Brand {
     colors: b.colors,
     font: b.font,
     ...(b.logo ? { logo: b.logo } : {}),
+    ...(customFonts.length ? { fonts: customFonts } : {}),
   };
 }
 
@@ -282,6 +301,7 @@ export function validateProject(
   input: unknown,
   depth = 0,
   budget = { count: 0, groups: 0 },
+  customFonts: string[] = [],
 ): Project {
   if (!input || typeof input !== "object")
     throw Error("That is not an OpenRang project.");
@@ -366,6 +386,7 @@ export function validateProject(
         { ...p, scene: { objects: raw.objects } },
         depth + 1,
         budget,
+        customFonts,
       ).scene.objects;
     }
     if (raw.type === "Image" && raw.filters !== undefined) {
@@ -418,7 +439,34 @@ export function validateProject(
         throw Error("Invalid polygon.");
       obj.points = raw.points.map((v) => ({ x: v.x, y: v.y }));
     }
-    if (raw.fontFamily && !fonts.includes(String(raw.fontFamily)))
+    if (raw.shadow !== undefined && raw.shadow !== null) {
+      const s = raw.shadow as Record<string, unknown>;
+      if (
+        !s ||
+        typeof s !== "object" ||
+        !color(s.color) ||
+        !["blur", "offsetX", "offsetY"].every(
+          (k) =>
+            typeof s[k] === "number" &&
+            Number.isFinite(s[k]) &&
+            Math.abs(s[k]) <= 200,
+        ) ||
+        (s.blur as number) < 0
+      )
+        throw Error("Invalid layer shadow.");
+      obj.shadow = {
+        color: s.color,
+        blur: s.blur,
+        offsetX: s.offsetX,
+        offsetY: s.offsetY,
+        affectStroke: false,
+        nonScaling: false,
+      };
+    }
+    if (
+      raw.fontFamily &&
+      ![...fonts, ...customFonts].includes(String(raw.fontFamily))
+    )
       obj.fontFamily = fonts[0];
     return obj;
   });
@@ -433,7 +481,7 @@ export function validateProject(
 }
 
 let dbPromise: Promise<IDBDatabase> | undefined;
-function database() {
+export function database() {
   return (dbPromise ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("openrang", 1);
     request.onupgradeneeded = () => request.result.createObjectStore("studio");

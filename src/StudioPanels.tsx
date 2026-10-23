@@ -515,8 +515,7 @@ export function ImageTools({
       <h3 className="property-label">Photo adjustments</h3>
       {(["Brightness", "Contrast", "Saturation"] as const).map((name) => {
         const f = image.filters.find((f) => f.type === name)?.toObject() as
-          | Record<string, unknown>
-          | undefined;
+          Record<string, unknown> | undefined;
         const value = Number(f?.[name.toLowerCase()] || 0);
         return (
           <label className="adjustment-field" key={name}>
@@ -565,7 +564,7 @@ export function BrandRestore({
   onImport,
   notify,
 }: {
-  onImport: (b: Brand) => Promise<void>;
+  onImport: (b: Brand) => Promise<boolean>;
   notify: (s: string) => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -590,10 +589,12 @@ export function BrandRestore({
           if (file)
             void (async () => {
               try {
-                if (file.size > 18 * 1024 * 1024)
+                if (file.size > 25 * 1024 * 1024)
                   throw Error("Brand kit file is too large.");
-                await onImport(validateBrand(JSON.parse(await file.text())));
-                notify("Brand kit restored.");
+                if (
+                  await onImport(validateBrand(JSON.parse(await file.text())))
+                )
+                  notify("Brand kit restored.");
               } catch (e) {
                 notify((e as Error).message);
               }

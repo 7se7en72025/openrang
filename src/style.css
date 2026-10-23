@@ -2202,3 +2202,101 @@ dialog::backdrop {
     background: #fff0e9;
   }
 }
+.design-tool-section {
+  border-top: 1px solid #e6e6e0;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.design-tool-section > .muted {
+  margin-bottom: 12px;
+}
+.design-tool-section .row {
+  margin-bottom: 12px;
+}
+.font-library-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.font-library-row .secondary {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.asset-library-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 16px 0;
+}
+.asset-library-card {
+  min-width: 0;
+  border: 1px solid #e6e6e0;
+  border-radius: 8px;
+  padding: 6px;
+}
+.asset-use {
+  width: 100%;
+  text-align: left;
+}
+.asset-use img,
+.font-tile {
+  width: 100%;
+  height: 90px;
+  object-fit: contain;
+  background: #f7f1df;
+  border-radius: 5px;
+}
+.font-tile {
+  display: grid;
+  place-items: center;
+  font-family: Georgia;
+  font-size: 38px;
+}
+.asset-use strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  margin-top: 6px;
+}
+.asset-use small {
+  color: #7b7d73;
+}
+.asset-library-card .text-link {
+  font-size: 10px;
+  margin-top: 8px;
+}
+.graphics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.graphics-grid button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  gap: 4px;
+  font-size: 10px;
+}
+.graphics-grid span {
+  font-size: 27px;
+  color: #3155e7;
+}
+.layout-preview {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid #00000008;
+}
+.template-card {
+  align-self: start;
+}
+.filter-row {
+  flex-wrap: wrap;
+}
+.rail {
+  overflow-y: auto;
+}

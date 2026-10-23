@@ -47,7 +47,13 @@ import {
   AlignRight,
   WandSparkles,
 } from "lucide-react";
-import { FabricImage, Textbox, ActiveSelection } from "fabric";
+import {
+  FabricImage,
+  Textbox,
+  ActiveSelection,
+  Group,
+  type FabricObject,
+} from "fabric";
 import { Editor, type EditorState } from "./editor";
 import {
   color,
@@ -63,6 +69,8 @@ import {
   type Brand,
 } from "./project";
 import { templates, templateProject } from "./templates";
+import { TemplatePreview } from "./TemplatePreview";
+import { AssetLibrary, FontTools, EffectTools } from "./DesignTools";
 import {
   ProjectsPanel,
   PagesBar,
@@ -73,6 +81,14 @@ import {
 } from "./StudioPanels";
 const CloudStudio = lazy(() => import("./CloudStudio"));
 const MotionStudio = lazy(() => import("./MotionStudio"));
+function selectionColor(object: FabricObject | undefined): unknown {
+  if (object instanceof Group)
+    return object
+      .getObjects()
+      .map(selectionColor)
+      .find((value) => typeof value === "string");
+  return object instanceof FabricImage ? undefined : object?.fill;
+}
 
 const initial: EditorState = {
   title: "Good things",
@@ -98,6 +114,7 @@ type Panel =
   | "Elements"
   | "Text"
   | "Uploads"
+  | "Assets"
   | "Brand kit"
   | "Layers";
 const panels = [
@@ -106,6 +123,7 @@ const panels = [
   { name: "Elements", icon: Shapes },
   { name: "Text", icon: Type },
   { name: "Uploads", icon: ImagePlus },
+  { name: "Assets", icon: FolderOpen },
   { name: "Brand kit", icon: Palette },
   { name: "Layers", icon: Layers },
 ] as const;
@@ -407,21 +425,25 @@ export default function App() {
     return editor.current;
   };
   const updateBrand = async (next: Brand) => {
-    setBrand(next);
     try {
-      await writeLocal("brand", next);
-    } catch {
-      notify("Brand kit could not be saved. Device storage may be full.");
+      const checked = validateBrand(next);
+      await writeLocal("brand", checked);
+      setBrand(checked);
+      return true;
+    } catch (error) {
+      notify(
+        error instanceof DOMException
+          ? "Brand kit could not be saved. Device storage may be full."
+          : (error as Error).message,
+      );
+      return false;
     }
   };
   const change = (values: Record<string, unknown>) =>
     run(() => ed().change(values));
   const object = state.active;
   const textObject = object instanceof Textbox;
-  const selectionFill =
-    object instanceof ActiveSelection
-      ? object.getObjects().find((o) => !(o instanceof FabricImage))?.fill
-      : object?.fill;
+  const selectionFill = selectionColor(object ?? undefined);
   const selectionOpacity =
     object instanceof ActiveSelection
       ? (object.getObjects()[0]?.opacity ?? 1)
@@ -648,7 +670,14 @@ export default function App() {
                   <span>⌕</span>
                 </label>
                 <div className="filter-row">
-                  {["All", "Social", "Business", "Event"].map((f) => (
+                  {[
+                    "All",
+                    "Social",
+                    "Business",
+                    "Event",
+                    "Slides",
+                    "Documents",
+                  ].map((f) => (
                     <button
                       key={f}
                       className={filter === f ? "filter active" : "filter"}
@@ -676,25 +705,29 @@ export default function App() {
                       disabled={!ready || state.busy}
                       aria-label={`Use ${t.name} template`}
                     >
-                      <div
-                        className={`template-art art-${t.id}`}
-                        style={{
-                          background: t.bg,
-                          color: t.ink,
-                          fontFamily: t.family,
-                        }}
-                      >
-                        <span className="art-eyebrow">{t.eyebrow}</span>
-                        <strong>{t.headline}</strong>
-                        {t.id !== "blank" && (
-                          <>
-                            <i style={{ background: t.accent }} />
-                            <small style={{ color: t.bg }}>{t.label}</small>
-                            <span className="art-footer">{t.footer}</span>
-                          </>
-                        )}
-                        {t.id === "blank" && <Plus size={28} />}
-                      </div>
+                      {t.layout ? (
+                        <TemplatePreview template={t} />
+                      ) : (
+                        <div
+                          className={`template-art art-${t.id}`}
+                          style={{
+                            background: t.bg,
+                            color: t.ink,
+                            fontFamily: t.family,
+                          }}
+                        >
+                          <span className="art-eyebrow">{t.eyebrow}</span>
+                          <strong>{t.headline}</strong>
+                          {t.id !== "blank" && (
+                            <>
+                              <i style={{ background: t.accent }} />
+                              <small style={{ color: t.bg }}>{t.label}</small>
+                              <span className="art-footer">{t.footer}</span>
+                            </>
+                          )}
+                          {t.id === "blank" && <Plus size={28} />}
+                        </div>
+                      )}
                       <div className="template-caption">
                         <span>{t.name}</span>
                         <span className="free-tag">FREE</span>
@@ -812,6 +845,17 @@ export default function App() {
                 ))}
               </>
             )}
+            {panel === "Text" && ready && (
+              <FontTools
+                editor={ed()}
+                brand={brand}
+                updateBrand={updateBrand}
+                notify={notify}
+              />
+            )}
+            {panel === "Assets" && ready && (
+              <AssetLibrary editor={ed()} notify={notify} />
+            )}
             {panel === "Uploads" && (
               <>
                 <button
@@ -912,15 +956,44 @@ export default function App() {
                     {fonts.map((f) => (
                       <option key={f}>{f}</option>
                     ))}
+                    {(brand.fonts ?? []).map((f) => (
+                      <option key={f.family} value={f.family}>
+                        {f.name}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button
                   className="secondary full"
                   disabled={!textObject}
-                  onClick={() => change({ fontFamily: brand.font })}
+                  onClick={() =>
+                    run(async () => {
+                      const font = brand.fonts?.find(
+                        (f) => f.family === brand.font,
+                      );
+                      if (font) await ed().useFont(font);
+                      else await change({ fontFamily: brand.font });
+                    })
+                  }
                 >
                   Apply font to selected text
                 </button>
+                {(brand.fonts ?? []).some((f) => f.family === brand.font) && (
+                  <button
+                    className="text-link"
+                    onClick={() =>
+                      void updateBrand({
+                        ...brand,
+                        fonts: brand.fonts?.filter(
+                          (f) => f.family !== brand.font,
+                        ),
+                        font: fonts[0],
+                      })
+                    }
+                  >
+                    Remove selected custom font from kit
+                  </button>
+                )}
                 <h3 className="mini-heading">Your logo</h3>
                 {brand.logo ? (
                   <>
@@ -1175,6 +1248,11 @@ export default function App() {
                           {f.replace(" Variable", "")}
                         </option>
                       ))}
+                      {(editor.current?.fonts ?? []).map((f) => (
+                        <option key={f.family} value={f.family}>
+                          {f.name}
+                        </option>
+                      ))}
                     </select>
                     <div className="row">
                       <label className="number-field">
@@ -1261,6 +1339,9 @@ export default function App() {
                       ))}
                     </div>
                   </>
+                )}
+                {!(object instanceof ActiveSelection) && (
+                  <EffectTools editor={ed()} object={object} run={run} />
                 )}
                 {object instanceof FabricImage && (
                   <>
@@ -1685,8 +1766,8 @@ export default function App() {
           )}
           {format === "svg" && (
             <p className="muted small">
-              SVG text uses font names. Install the same fonts on the device
-              where you open it.
+              Uploaded custom fonts are embedded. Built-in text uses font names;
+              install those fonts on the device where you open the SVG.
             </p>
           )}
           {format === "json" && (

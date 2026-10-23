@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- Embedded custom fonts with native decoding, content-hash identities and pooled project/history assets.
+- Portable typography in editable projects, SVG and brand kits; unused project fonts can be removed safely and restored with Undo.
+- Outline, drop shadow, line/letter spacing, underline and strikethrough with validated roundtrips.
+- 12 additional original layouts in real story, thumbnail, slide, card and document formats; 20 starting designs total, including blank.
+- Searchable local photo/font library with thumbnails, on-demand reads, atomic cross-tab saves/removals and bounded storage.
+- Six original editable graphics: star, heart, arrow, flower, checker and speech bubble.
+- Preserve project copies after library removal; reject corrupt/tampered fonts before replacing the canvas.
+- Guard asynchronous image insertion if the user changes pages while decoding.
+- Report brand-kit storage failures accurately and support larger font-bearing kit backups.
+
 ## 0.3.0
 
 - Optional signed-in cloud library backed by R2, including recoverable cloud Trash.
