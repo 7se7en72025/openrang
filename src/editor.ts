@@ -286,8 +286,16 @@ export class Editor {
       this.emit();
     }
     await this.load(doc, false);
-    this.history.clear();
-    this.commit();
+    this.busy = true;
+    this.emit();
+    try {
+      this.history.clear();
+      this.commit();
+      await this.flush();
+    } finally {
+      this.busy = false;
+      this.emit();
+    }
   }
   async applyTemplate(project: Project) {
     const p = pageFromProject(project),

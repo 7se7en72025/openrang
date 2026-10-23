@@ -54,7 +54,7 @@ For optional cloud features, the build also produces a standalone Sites Worker a
 
 Designs and the brand kit autosave in IndexedDB on this device. **Download project backups for important work.** Clearing site data removes the local library. Cloud storage is opt-in, through **Cloud and team**; local autosave and cloud save have separate status messages.
 
-File imports stage their contents before replacing the canvas. Switching designs waits for the current save. Autosave failures are shown rather than reported as success. Version 1 project files are migrated to the multi-page format; imported copies receive a separate library identity.
+File imports stage their contents before replacing the canvas. Opening a design waits for the previous save and persists the newly opened copy before the operation completes. Autosave failures are shown rather than reported as success. Version 1 project files are migrated to the multi-page format; imported copies receive a separate library identity.
 
 Trash is recoverable. Open another design before moving the currently open design to Trash. This release intentionally offers no permanent-delete action.
 

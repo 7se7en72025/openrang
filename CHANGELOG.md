@@ -10,6 +10,7 @@
 - Six original editable graphics: star, heart, arrow, flower, checker and speech bubble.
 - Preserve project copies after library removal; reject corrupt/tampered fonts before replacing the canvas.
 - Guard asynchronous image insertion if the user changes pages while decoding.
+- Opening/importing a project persists its new local copy before reporting completion; browser reload checks wait for the completed operation.
 - Report brand-kit storage failures accurately and support larger font-bearing kit backups.
 
 ## 0.3.0

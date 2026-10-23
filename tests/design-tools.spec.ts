@@ -223,6 +223,10 @@ test("asset photos and graphics remain editable after library removal and across
     mimeType: "application/json",
     buffer: bytes,
   });
+  await expect(page.getByRole("status")).toContainText("Project opened");
+  await expect(
+    page.getByText("Saved on this device", { exact: true }),
+  ).toBeVisible();
   await page.reload();
   await expect(
     page.getByText("Saved on this device", { exact: true }),
